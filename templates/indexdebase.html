@@ -1,0 +1,284 @@
+
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Travel Planner avec LLM</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin:0; background:#f0f2f5; display:flex; flex-direction:column; min-height:100vh; }
+header { padding:20px; background:#0056b3; color:white; text-align:center; }
+header h1 { margin:0; font-size:1.8rem; }
+header p { margin:5px 0 0 0; font-size:1rem; }
+.controls { padding:15px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+select, input, button { padding:10px; font-size:16px; border-radius:6px; border:1px solid #ccc; }
+button { background:#0056b3; color:white; border:none; cursor:pointer; transition:0.3s; }
+button:hover { background:#003f7f; }
+input[type="range"] { width:200px; }
+.main-container { flex:1; display:flex; flex-wrap:wrap; gap:20px; padding:20px; }
+.map-column, .list-column { background:#fff; border-radius:10px; padding:15px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+.map-column { flex:1 1 400px; }
+.list-column { flex:1.2 1 400px; display:flex; flex-direction:column; gap:15px; }
+#map { width:100%; height:450px; border-radius:10px; }
+.card { background:#fefefe; border-radius:8px; padding:12px 16px; box-shadow:0 1px 4px rgba(0,0,0,0.08); transition:transform 0.2s; }
+.card:hover { transform:translateY(-3px); }
+.card h3 { margin:0 0 5px 0; color:#0056b3; }
+.card p { margin:3px 0; font-size:0.95rem; }
+@media (max-width:900px) {
+    .main-container { flex-direction:column; padding:10px; }
+    .map-column, .list-column { flex:1 1 100%; }
+}
+</style>
+</head>
+<body>
+
+<header>
+<h1>Travel Planner</h1>
+<p>Choisissez vos centres d'intérêt et découvrez les meilleures villes et événements.</p>
+</header>
+
+<div class="controls">
+<label for="interest-select">Centre d'intérêt :</label>
+<select id="interest-select"><option value="">Chargement...</option></select>
+
+<label for="search-input">Recherche libre :</label>
+<input type="text" id="search-input" placeholder="Entrez une phrase ou un mot-clé">
+
+<label for="date-start">Date de début :</label>
+<input type="date" id="date-start">
+
+<label for="date-end">à</label>
+<input type="date" id="date-end">
+
+<button id="search-button">Rechercher</button>
+<button id="sort-date-button">Trier par date</button>
+
+
+</div>
+
+<div class="main-container">
+<div class="map-column">
+<h2>Carte des événements</h2>
+<div id="map"></div>
+<h2>Villes recommandées</h2>
+<div id="city-results-container"><p>Les villes avec le plus d'activités s'afficheront ici.</p></div>
+</div>
+
+<div class="list-column">
+<h2>Détails des événements</h2>
+<div id="event-list-container"><p>Les événements correspondants s'afficheront ici.</p></div>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const interestSelect = document.getElementById('interest-select');
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    const eventListContainer = document.getElementById('event-list-container');
+    const cityResultsContainer = document.getElementById('city-results-container');
+    const dateStartInput = document.getElementById('date-start');
+    const dateEndInput = document.getElementById('date-end');
+    const sortButton = document.getElementById('sort-date-button');
+    let sortByDate = false;
+
+    sortButton.addEventListener('click', () => {
+        sortByDate = !sortByDate;
+        sortButton.textContent = sortByDate ? "Tri : Date ↑" : "Trier par date";
+        searchEvents();
+    });
+
+
+
+
+
+
+
+
+
+        // ------------------------------------------
+    // 📅 Fonction de formatage dynamique des dates
+    // ------------------------------------------
+    function formatDateDynamic(event) {
+        const start = event.DateTime_start ? new Date(event.DateTime_start) : null;
+        const end = event.DateTime_end ? new Date(event.DateTime_end) : null;
+
+        if (!start) return "Non indiquée";
+
+        const options = { day: "numeric", month: "long", year: "numeric" };
+
+        // Cas : une seule date
+        if (!end || start.getTime() === end.getTime()) {
+            return start.toLocaleDateString("fr-FR", options);
+        }
+
+        // Cas : même mois + même année
+        if (start.getFullYear() === end.getFullYear() &&
+            start.getMonth() === end.getMonth()) {
+            return `${start.getDate()}–${end.getDate()} ${start.toLocaleDateString(
+                "fr-FR",
+                { month: "long", year: "numeric" }
+            )}`;
+        }
+
+        // Cas : même année, mois différents
+        if (start.getFullYear() === end.getFullYear()) {
+            return `${start.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} – ${
+                end.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+            }`;
+        }
+
+        // Cas : années différentes
+        return `${start.toLocaleDateString("fr-FR", options)} – ${end.toLocaleDateString("fr-FR", options)}`;
+    }
+
+
+
+
+
+
+
+
+
+
+    // ----------------------------------------------------
+    // 🌍 Fonction universelle pour nom de langue en FR
+    // ----------------------------------------------------
+    const langNames = new Intl.DisplayNames(['fr'], { type: 'language' });
+
+    function getLanguageName(langCode) {
+        if (!langCode) return "N/A";
+        try {
+            return langNames.of(langCode) || langCode;
+        } catch {
+            return langCode;
+        }
+    }
+
+
+
+
+
+    const map = L.map('map').setView([46.603354, 1.888334], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let markersLayer = L.layerGroup().addTo(map);
+
+    // Charger catégories
+    fetch('/api/categories')
+        .then(res => res.json())
+        .then(categories => {
+            interestSelect.innerHTML = '<option value="">-- Sélectionner un centre d\'intérêt --</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                interestSelect.appendChild(option);
+            });
+        });
+
+    // -------------------------
+    // 🔎 Fonction principale
+    // -------------------------
+    function searchEvents() {
+        const interest = interestSelect.value.trim();
+        const query = searchInput.value.trim();
+        const startDate = dateStartInput.value;
+        const endDate = dateEndInput.value;
+
+        // Construire URL EVENTS
+        let urlEvents = `/api/smart-search?`;
+        if (interest) urlEvents += `interests=${encodeURIComponent(interest)}&`;
+        if (query) urlEvents += `q=${encodeURIComponent(query)}&`;
+        if (startDate) urlEvents += `start_date=${encodeURIComponent(startDate)}&`;
+        if (endDate) urlEvents += `end_date=${encodeURIComponent(endDate)}`;
+        if (sortByDate) urlEvents += `&sort=date`;
+
+
+        fetch(urlEvents)
+            .then(res => res.json())
+            .then(events => {
+                eventListContainer.innerHTML = '';
+                markersLayer.clearLayers();
+
+                if (!events.length) {
+                    eventListContainer.innerHTML = '<p>Aucun événement trouvé.</p>';
+                    return;
+                }
+
+                events.forEach(event => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <h3>${event.EventName || 'Sans titre'}</h3>
+                        <p><strong>Catégorie:</strong> ${event.Category}</p>
+                        <p><strong>Ville:</strong> ${event.City}</p>
+                        <p><strong>Langue originale :</strong> ${getLanguageName(event.Langue)}</p>
+                        <p><strong>Description:</strong> ${event.Description || 'Aucune description'}</p>
+                        <p><strong>Source :</strong> <a href="${event.Link || '#'}" target="_blank">Voir l’événement</a></p>
+                        <p><strong>Date :</strong> ${formatDateDynamic(event)}</p>
+
+
+                    `;
+                    eventListContainer.appendChild(card);
+
+                    if (event.lat && event.lon) {
+                        const marker = L.marker([event.lat, event.lon]).addTo(markersLayer);
+                        marker.bindPopup(`
+                            <strong>${event.EventName || 'Sans titre'}</strong><br>
+                            <em>${event.Category}</em><br>
+                            ${event.City}<br>
+                            Date : ${formatDateDynamic(event)}<br>
+                            Langue: ${event.Langue || 'N/A'}<br>
+                            ${event.Description || ''}<br>
+                            <a href="${event.Link || '#'}" target="_blank">🔗 Voir l’événement</a>
+                        `);
+                    }
+                });
+
+                if (markersLayer.getLayers().length) {
+                    map.fitBounds(markersLayer.getBounds().pad(0.2));
+                }
+            });
+
+        // Construire URL VILLES
+        let urlCities = `/api/cities-by-llm?`;
+        if (interest) urlCities += `interests=${encodeURIComponent(interest)}&`;
+        if (query) urlCities += `q=${encodeURIComponent(query)}&`;
+        if (startDate) urlCities += `start_date=${encodeURIComponent(startDate)}&`;
+        if (endDate) urlCities += `end_date=${encodeURIComponent(endDate)}`;
+
+        fetch(urlCities)
+            .then(res => res.json())
+            .then(cities => {
+                cityResultsContainer.innerHTML = '';
+                if (!cities.length) {
+                    cityResultsContainer.innerHTML = '<p>Aucune ville trouvée.</p>';
+                    return;
+                }
+
+                cities.forEach(city => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <h3>${city.City}</h3>
+                        <p>Nombre d'événements: ${city.count}</p>
+                    `;
+                    cityResultsContainer.appendChild(card);
+                });
+            });
+    }
+
+    searchButton.addEventListener('click', searchEvents);
+});
+</script>
+
+</body>
+</html>
