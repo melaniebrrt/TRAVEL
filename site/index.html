@@ -106,14 +106,13 @@ body.dark #map{filter:brightness(0.8);}
       <p class="small">Astuce: combinez plusieurs centres d'intérêt en appelant l'API côté serveur si besoin.</p>
     </aside>
   </section>
-
 </main>
 
 <footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni.</footer>
 
 <script>
 // --- Helpers ---
-function normalizeText(str){ if(!str) return ''; return String(str).trim(); }
+function normalizeText(str){ return str ? String(str).trim() : ''; }
 function formatDateDynamic(event){
     const start = event.DateTime_start ? new Date(event.DateTime_start) : null;
     const end = event.DateTime_end ? new Date(event.DateTime_end) : null;
@@ -144,19 +143,26 @@ const dateStartInput = document.getElementById('date-start');
 const dateEndInput = document.getElementById('date-end');
 const sortButton = document.getElementById('sort-date-button');
 let sortByDate = false;
-sortButton.addEventListener('click',()=>{sortByDate=!sortByDate; sortButton.textContent = sortByDate? 'Trier: Date ↑' : 'Trier'; searchEvents();});
+
+// Sort toggle
+sortButton.addEventListener('click',()=>{
+    sortByDate = !sortByDate;
+    sortButton.textContent = sortByDate ? 'Trier: Date ↑' : 'Trier';
+    searchEvents();
+});
 
 // Load categories
 fetch('/api/categories').then(r=>r.json()).then(list=>{
     interestSelect.innerHTML = '<option value="">-- Tous --</option>';
     list.forEach(c=>{
-        const o=document.createElement('option');
-        o.value=c;
-        o.textContent=c;
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
         interestSelect.appendChild(o);
     });
 });
 
+// Create event card
 function createEventCard(e){
     const wrap = document.createElement('div'); wrap.className='event-card';
     const meta = document.createElement('div'); meta.className='meta';
@@ -165,31 +171,30 @@ function createEventCard(e){
     const title = document.createElement('h3'); title.textContent = e.EventName||'Sans titre';
     const desc = document.createElement('p'); desc.textContent = e.Description? (e.Description.length>180? e.Description.slice(0,180)+'…':e.Description) : 'Pas de description.';
     const tags = document.createElement('div'); tags.className='tags';
-    if(e.Category) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Category; tags.appendChild(t);} 
-    if(e.Langue) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Langue; tags.appendChild(t);} 
+    if(e.Category) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Category; tags.appendChild(t); }
     const link = document.createElement('a'); link.href = e.Link||'#'; link.target='_blank'; link.className='small'; link.style.display='inline-block'; link.style.marginTop='8px'; link.textContent='Voir la source ↗';
     body.appendChild(title); body.appendChild(desc); body.appendChild(tags); body.appendChild(link);
     wrap.appendChild(meta); wrap.appendChild(body);
     return wrap;
 }
 
+// Search function
 function searchEvents(){
     const interest = interestSelect.value.trim();
     const query = searchInput.value.trim();
-    const startDate = dateStartInput.value; 
+    const startDate = dateStartInput.value;
     const endDate = dateEndInput.value;
 
-    // Créer params dynamiquement : on n'envoie start/end que si elles existent
     let params = [];
-    if(query) params.push(`q=${encodeURIComponent(query)}`);
     if(interest) params.push(`interests=${encodeURIComponent(interest)}`);
+    if(query) params.push(`q=${encodeURIComponent(query)}`);
     if(startDate) params.push(`start_date=${encodeURIComponent(startDate)}`);
     if(endDate) params.push(`end_date=${encodeURIComponent(endDate)}`);
     if(sortByDate) params.push(`sort=date`);
+    const queryStr = params.join('&');
 
-    let urlEvents = `/api/smart-search?${params.join('&')}`;
-
-    fetch(urlEvents).then(r=>r.json()).then(events=>{
+    // Events
+    fetch(`/api/smart-search?${queryStr}`).then(r=>r.json()).then(events=>{
         eventListContainer.innerHTML=''; markersLayer.clearLayers();
         if(!events || !events.length){ 
             eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; 
@@ -207,8 +212,7 @@ function searchEvents(){
     });
 
     // Cities
-    let urlCities = `/api/cities-by-llm?${params.join('&')}`;
-    fetch(urlCities).then(r=>r.json()).then(cities=>{
+    fetch(`/api/cities-by-llm?${queryStr}`).then(r=>r.json()).then(cities=>{
         cityResultsContainer.innerHTML='';
         if(!cities || !cities.length){ 
             cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; 
@@ -223,17 +227,18 @@ function searchEvents(){
     });
 }
 
+// Event listeners
 searchButton.addEventListener('click', searchEvents);
 searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') searchEvents(); });
 
-// 🔥 DARK MODE BUTTON
+// Dark mode
 document.getElementById('dark-toggle').addEventListener('click',()=>{
   document.documentElement.classList.toggle('dark');
   document.body.classList.toggle('dark');
 });
 feather.replace();
 
-// initial load
+// Initial load
 searchEvents();
 </script>
 
