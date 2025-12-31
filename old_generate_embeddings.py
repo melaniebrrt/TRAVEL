@@ -15,6 +15,7 @@ embeddings = model.encode(
 
 # Sauvegarder embeddings
 import numpy as np
-np.save("event_embeddings.npy", embeddings)
+np.save("old_event_embeddings.npy", embeddings)
 
 print("Embeddings générés et sauvegardés.")
+
