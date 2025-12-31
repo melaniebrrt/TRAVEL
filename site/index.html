@@ -118,7 +118,7 @@ body.dark #map{filter:brightness(0.8);}
 </div>
 </main>
 
-<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni. fileciteturn0file0</footer>
+<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni.  </footer>
 
 <script>
 // --- Helpers (réutilisation logic côté client de votre version) ---
@@ -133,7 +133,7 @@ function formatDateDynamic(event){
         return `${start.getDate()}–${end.getDate()} ${start.toLocaleDateString('fr-FR',{month:'long', year:'numeric'})}`;
     }
     if(start.getFullYear()===end.getFullYear()){
-        return `${start.toLocaleDateString('fr-FR',{day:'numeric', month:'long'})} – ${end.toLocaleDateString('fr-FR',{day:'numeric', month:'long', year:'numeric'})}`;
+        return `${start.toLocaleDateString('fr-FR',{day: 'numeric', month:'long'})} – ${end.toLocaleDateString('fr-FR',{day:'numeric', month:'long', year:'numeric'})}`;
     }
     return `${start.toLocaleDateString('fr-FR',options)} – ${end.toLocaleDateString('fr-FR',options)}`;
 }
@@ -161,6 +161,61 @@ fetch('/api/categories').then(r=>r.json()).then(list=>{
     list.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; interestSelect.appendChild(o); });
 });
 
+// --- Fonction searchEvents modifiée ---
+function searchEvents(){
+    const interest = interestSelect.value.trim();
+    const query = searchInput.value.trim();
+    const startDate = dateStartInput.value; 
+    const endDate = dateEndInput.value;
+    let urlEvents = `/api/smart-search?`;
+
+    if(interest) urlEvents += `interests=${encodeURIComponent(interest)}&`;
+    if(query) urlEvents += `q=${encodeURIComponent(query)}&`;
+    if(startDate) urlEvents += `start_date=${encodeURIComponent(startDate)}&`;
+    if(endDate) urlEvents += `end_date=${encodeURIComponent(endDate)}&`;
+    if(sortByDate) urlEvents += `sort=date`;
+
+    fetch(urlEvents).then(r=>r.json()).then(events=>{
+        eventListContainer.innerHTML=''; 
+        markersLayer.clearLayers();
+        if(!events || !events.length){ 
+            eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; 
+            cityResultsContainer.innerHTML='<div class="small">-</div>'; 
+            return; 
+        }
+        events.slice(0,60).forEach(ev=>{
+            eventListContainer.appendChild(createEventCard(ev));
+            if(ev.lat && ev.lon){ 
+                const m = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
+                m.bindPopup(`<strong>${ev.EventName||'Sans titre'}</strong><br>${ev.Category||''}<br>${ev.City||''}<br>${formatDateDynamic(ev)}<br><a href='${ev.Link||'#'}' target='_blank'>Voir ↗</a>`);
+            }
+        });
+        if(markersLayer.getLayers().length) map.fitBounds(markersLayer.getBounds().pad(0.15));
+    });
+
+    // Cities
+    let urlCities = `/api/cities-by-llm?`;
+    if(interest) urlCities += `interests=${encodeURIComponent(interest)}&`;
+    if(query) urlCities += `q=${encodeURIComponent(query)}&`;
+    if(startDate) urlCities += `start_date=${encodeURIComponent(startDate)}&`;
+    if(endDate) urlCities += `end_date=${encodeURIComponent(endDate)}&`;
+
+    fetch(urlCities).then(r=>r.json()).then(cities=>{
+        cityResultsContainer.innerHTML='';
+        if(!cities || !cities.length){ 
+            cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; 
+            return; 
+        }
+        cities.slice(0,8).forEach(c=>{ 
+            const d=document.createElement('div'); 
+            d.className='city-pill'; 
+            d.innerHTML = `<span>${c.City}</span><span class='small'>${c.count}</span>`; 
+            cityResultsContainer.appendChild(d); 
+        });
+    });
+}
+
+// --- Autres scripts ---
 function createEventCard(e){
     const wrap = document.createElement('div'); wrap.className='event-card';
     const meta = document.createElement('div'); meta.className='meta';
@@ -177,44 +232,7 @@ function createEventCard(e){
     return wrap;
 }
 
-function searchEvents(){
-    const interest = interestSelect.value.trim();
-    const query = searchInput.value.trim();
-    const startDate = dateStartInput.value; const endDate = dateEndInput.value;
-    let urlEvents = `/api/smart-search?`;
-    if(interest) urlEvents += `interests=${encodeURIComponent(interest)}&`;
-    if(query) urlEvents += `q=${encodeURIComponent(query)}&`;
-    if(startDate) urlEvents += `start_date=${encodeURIComponent(startDate)}&`;
-    if(endDate) urlEvents += `end_date=${encodeURIComponent(endDate)}&`;
-    if(sortByDate) urlEvents += `sort=date`;
-
-    fetch(urlEvents).then(r=>r.json()).then(events=>{
-        eventListContainer.innerHTML=''; markersLayer.clearLayers();
-        if(!events || !events.length){ eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; cityResultsContainer.innerHTML='<div class="small">-</div>'; return; }
-        events.slice(0,60).forEach(ev=>{
-            eventListContainer.appendChild(createEventCard(ev));
-            if(ev.lat && ev.lon){ const m = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
-                m.bindPopup(`<strong>${ev.EventName||'Sans titre'}</strong><br>${ev.Category||''}<br>${ev.City||''}<br>${formatDateDynamic(ev)}<br><a href='${ev.Link||'#'}' target='_blank'>Voir ↗</a>`);
-            }
-        });
-        if(markersLayer.getLayers().length) map.fitBounds(markersLayer.getBounds().pad(0.15));
-    });
-
-    // Cities
-    let urlCities = `/api/cities-by-llm?`;
-    if(interest) urlCities += `interests=${encodeURIComponent(interest)}&`;
-    if(query) urlCities += `q=${encodeURIComponent(query)}&`;
-    if(startDate) urlCities += `start_date=${encodeURIComponent(startDate)}&`;
-    if(endDate) urlCities += `end_date=${encodeURIComponent(endDate)}&`;
-    fetch(urlCities).then(r=>r.json()).then(cities=>{
-        cityResultsContainer.innerHTML='';
-        if(!cities || !cities.length){ cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; return; }
-        cities.slice(0,8).forEach(c=>{ const d=document.createElement('div'); d.className='city-pill'; d.innerHTML = `<span>${c.City}</span><span class='small'>${c.count}</span>`; cityResultsContainer.appendChild(d); });
-    });
-}
-
 searchButton.addEventListener('click', searchEvents);
-// quick search on enter
 searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') searchEvents(); });
 
 // 🔥 DARK MODE BUTTON
@@ -228,24 +246,6 @@ feather.replace();
 searchEvents();
 </script>
 
-  <!-- 📦 PACK COMPLET D’ILLUSTRATIONS / ICONES 3D POUR UI -->
-  <div style="margin-top:60px; text-align:center;">
-    <h2 style="color:var(--accent); margin-bottom:20px;">Pack d’illustrations & icônes 3D</h2>
-    <p class="small" style="margin-bottom:25px;">Sélection premium Icons8 — utilisables immédiatement dans l’interface</p>
-
-    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:25px;">
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Travel-location-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-detailed-flat-icons/256/external-globe-geography-3d-detailed-flat-icons.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Airplane-travel-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Backpack-school-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Calendar-user-interface-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Location-maps-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Music-multimedia-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-      <img src="https://img.icons8.com/external-3d-design-bear-3d/256/external-Event-business-3d-design-bear-3d.png" style="width:120px; filter:drop-shadow(0 7px 18px rgba(0,0,0,0.15));" />
-    </div>
-
-    <p class="small" style="margin-top:20px;">Tu peux utiliser ces icônes directement dans le site : catégories, header, cards, etc.</p>
-  </div>
-
 </body>
 </html>
+
