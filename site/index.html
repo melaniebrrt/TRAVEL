@@ -109,19 +109,12 @@ body.dark #map{filter:brightness(0.8);}
       <p class="small">Astuce: combinez plusieurs centres d'intérêt en appelant l'API côté serveur si besoin.</p>
     </aside>
   </section>
-  <!-- illustrations / hero icons -->
-  <div style="text-align:center; margin-top:40px; opacity:1">
-  <!-- 🧊 Illustration 3D (Base64, aucun fichier externe nécessaire !) -->
-  <img style="max-width:260px; filter:drop-shadow(0 10px 25px rgba(0,0,0,0.15));" alt="3D travel illustration"
-       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAGQCAYAAABP6KyFAAAACXBIWXMAAAsTAAALEwEAmpwYAAAgAElEQVR4nOzdCZRcVZ3/8c/5zpm5M7uzO7szOzu7szs7s7s7kzu7sz...TRUNCATED_FOR_BREVITY...AAAElFTkSuQmCC" />
-  <p style="margin-top:12px; font-size:0.95rem; color:var(--muted);">Illustration 3D intégrée directement en base64</p>
-</div>
 </main>
 
-<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni.  </footer>
+<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni.</footer>
 
 <script>
-// --- Helpers (réutilisation logic côté client de votre version) ---
+// --- Helpers ---
 function normalizeText(str){ if(!str) return ''; return String(str).trim(); }
 function formatDateDynamic(event){
     const start = event.DateTime_start ? new Date(event.DateTime_start) : null;
@@ -133,7 +126,7 @@ function formatDateDynamic(event){
         return `${start.getDate()}–${end.getDate()} ${start.toLocaleDateString('fr-FR',{month:'long', year:'numeric'})}`;
     }
     if(start.getFullYear()===end.getFullYear()){
-        return `${start.toLocaleDateString('fr-FR',{day: 'numeric', month:'long'})} – ${end.toLocaleDateString('fr-FR',{day:'numeric', month:'long', year:'numeric'})}`;
+        return `${start.toLocaleDateString('fr-FR',{day:'numeric', month:'long'})} – ${end.toLocaleDateString('fr-FR',{day:'numeric', month:'long', year:'numeric'})}`;
     }
     return `${start.toLocaleDateString('fr-FR',options)} – ${end.toLocaleDateString('fr-FR',options)}`;
 }
@@ -153,31 +146,54 @@ const dateStartInput = document.getElementById('date-start');
 const dateEndInput = document.getElementById('date-end');
 const sortButton = document.getElementById('sort-date-button');
 let sortByDate = false;
-sortButton.addEventListener('click',()=>{sortByDate=!sortByDate; sortButton.textContent = sortByDate? 'Trier: Date ↑' : 'Trier'; searchEvents();});
+sortButton.addEventListener('click',()=>{
+    sortByDate=!sortByDate; 
+    sortButton.textContent = sortByDate? 'Trier: Date ↑' : 'Trier'; 
+    searchEvents();
+});
 
 // Load categories
 fetch('/api/categories').then(r=>r.json()).then(list=>{
     interestSelect.innerHTML = '<option value="">-- Tous --</option>';
-    list.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; interestSelect.appendChild(o); });
+    list.forEach(c=>{
+        const o=document.createElement('option'); 
+        o.value=c; o.textContent=c; interestSelect.appendChild(o);
+    });
 });
 
-// --- Fonction searchEvents modifiée ---
+function createEventCard(e){
+    const wrap = document.createElement('div'); wrap.className='event-card';
+    const meta = document.createElement('div'); meta.className='meta';
+    meta.innerHTML = `<div class="small">${formatDateDynamic(e)}</div><div class="small">${e.City||'N/A'}</div>`;
+    const body = document.createElement('div'); body.style.flex='1';
+    const title = document.createElement('h3'); title.textContent = e.EventName||'Sans titre';
+    const desc = document.createElement('p'); 
+    desc.textContent = e.Description? (e.Description.length>180? e.Description.slice(0,180)+'…':e.Description) : 'Pas de description.';
+    const tags = document.createElement('div'); tags.className='tags';
+    if(e.Category) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Category; tags.appendChild(t);} 
+    if(e.Langue) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Langue; tags.appendChild(t);} 
+    const link = document.createElement('a'); link.href = e.Link||'#'; link.target='_blank'; link.className='small'; link.style.display='inline-block'; link.style.marginTop='8px'; link.textContent='Voir la source ↗';
+    body.appendChild(title); body.appendChild(desc); body.appendChild(tags); body.appendChild(link);
+    wrap.appendChild(meta); wrap.appendChild(body);
+    return wrap;
+}
+
 function searchEvents(){
     const interest = interestSelect.value.trim();
     const query = searchInput.value.trim();
     const startDate = dateStartInput.value; 
     const endDate = dateEndInput.value;
-    let urlEvents = `/api/smart-search?`;
 
+    // Smart search
+    let urlEvents = `/api/smart-search?`;
+    urlEvents += `q=${encodeURIComponent(query || '')}&`; // <-- toujours envoyer q
     if(interest) urlEvents += `interests=${encodeURIComponent(interest)}&`;
-    if(query) urlEvents += `q=${encodeURIComponent(query)}&`;
     if(startDate) urlEvents += `start_date=${encodeURIComponent(startDate)}&`;
     if(endDate) urlEvents += `end_date=${encodeURIComponent(endDate)}&`;
     if(sortByDate) urlEvents += `sort=date`;
 
     fetch(urlEvents).then(r=>r.json()).then(events=>{
-        eventListContainer.innerHTML=''; 
-        markersLayer.clearLayers();
+        eventListContainer.innerHTML=''; markersLayer.clearLayers();
         if(!events || !events.length){ 
             eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; 
             cityResultsContainer.innerHTML='<div class="small">-</div>'; 
@@ -195,17 +211,14 @@ function searchEvents(){
 
     // Cities
     let urlCities = `/api/cities-by-llm?`;
+    urlCities += `q=${encodeURIComponent(query || '')}&`; // <-- toujours envoyer q
     if(interest) urlCities += `interests=${encodeURIComponent(interest)}&`;
-    if(query) urlCities += `q=${encodeURIComponent(query)}&`;
     if(startDate) urlCities += `start_date=${encodeURIComponent(startDate)}&`;
     if(endDate) urlCities += `end_date=${encodeURIComponent(endDate)}&`;
 
     fetch(urlCities).then(r=>r.json()).then(cities=>{
         cityResultsContainer.innerHTML='';
-        if(!cities || !cities.length){ 
-            cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; 
-            return; 
-        }
+        if(!cities || !cities.length){ cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; return; }
         cities.slice(0,8).forEach(c=>{ 
             const d=document.createElement('div'); 
             d.className='city-pill'; 
@@ -215,37 +228,18 @@ function searchEvents(){
     });
 }
 
-// --- Autres scripts ---
-function createEventCard(e){
-    const wrap = document.createElement('div'); wrap.className='event-card';
-    const meta = document.createElement('div'); meta.className='meta';
-    meta.innerHTML = `<div class="small">${formatDateDynamic(e)}</div><div class="small">${e.City||'N/A'}</div>`;
-    const body = document.createElement('div'); body.style.flex='1';
-    const title = document.createElement('h3'); title.textContent = e.EventName||'Sans titre';
-    const desc = document.createElement('p'); desc.textContent = e.Description? (e.Description.length>180? e.Description.slice(0,180)+'…':e.Description) : 'Pas de description.';
-    const tags = document.createElement('div'); tags.className='tags';
-    if(e.Category) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Category; tags.appendChild(t);} 
-    if(e.Langue) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Langue; tags.appendChild(t);} 
-    const link = document.createElement('a'); link.href = e.Link||'#'; link.target='_blank'; link.className='small'; link.style.display='inline-block'; link.style.marginTop='8px'; link.textContent='Voir la source ↗';
-    body.appendChild(title); body.appendChild(desc); body.appendChild(tags); body.appendChild(link);
-    wrap.appendChild(meta); wrap.appendChild(body);
-    return wrap;
-}
-
 searchButton.addEventListener('click', searchEvents);
 searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') searchEvents(); });
 
-// 🔥 DARK MODE BUTTON
 document.getElementById('dark-toggle').addEventListener('click',()=>{
   document.documentElement.classList.toggle('dark');
   document.body.classList.toggle('dark');
 });
 feather.replace();
 
-// initial load
 searchEvents();
 </script>
-
 </body>
 </html>
+
 
