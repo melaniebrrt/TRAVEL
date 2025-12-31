@@ -48,9 +48,7 @@ body{background:linear-gradient(135deg,var(--bg-1),var(--bg-2));color:#122;displ
 .tag{background:linear-gradient(90deg,#eef3ff,#fff);padding:6px 8px;border-radius:999px;font-size:0.8rem;color:var(--accent);border:1px solid rgba(15,61,110,0.06)}
 .small{font-size:0.85rem;color:var(--muted)}
 .footer-note{text-align:center;padding:18px;color:var(--muted)}
-/* subtle animation */
 .event-card:hover{transform:translateY(-6px);transition:all 220ms ease}
-/* 🌙 DARK MODE */
 :root.dark{
   --bg-1:#0f172a;
   --bg-2:#1e293b;
@@ -61,7 +59,6 @@ body{background:linear-gradient(135deg,var(--bg-1),var(--bg-2));color:#122;displ
 body.dark{color:#e2e8f0;}
 body.dark .card, body.dark .city-pill, body.dark .event-card{background:rgba(255,255,255,0.08)!important; border:1px solid rgba(255,255,255,0.08);} 
 body.dark #map{filter:brightness(0.8);} 
-/* mobile refinements */
 @media(max-width:600px){
   .controls{flex-direction:column;align-items:stretch}
   .input,select,button{width:100%}
@@ -109,9 +106,10 @@ body.dark #map{filter:brightness(0.8);}
       <p class="small">Astuce: combinez plusieurs centres d'intérêt en appelant l'API côté serveur si besoin.</p>
     </aside>
   </section>
+
 </main>
 
-<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes.</footer>
+<footer class="footer-note">Inspiré par des ressources de design et des portfolios modernes. Voir fichier fourni.</footer>
 
 <script>
 // --- Helpers ---
@@ -151,7 +149,12 @@ sortButton.addEventListener('click',()=>{sortByDate=!sortByDate; sortButton.text
 // Load categories
 fetch('/api/categories').then(r=>r.json()).then(list=>{
     interestSelect.innerHTML = '<option value="">-- Tous --</option>';
-    list.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; interestSelect.appendChild(o); });
+    list.forEach(c=>{
+        const o=document.createElement('option');
+        o.value=c;
+        o.textContent=c;
+        interestSelect.appendChild(o);
+    });
 });
 
 function createEventCard(e){
@@ -163,6 +166,7 @@ function createEventCard(e){
     const desc = document.createElement('p'); desc.textContent = e.Description? (e.Description.length>180? e.Description.slice(0,180)+'…':e.Description) : 'Pas de description.';
     const tags = document.createElement('div'); tags.className='tags';
     if(e.Category) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Category; tags.appendChild(t);} 
+    if(e.Langue) { const t=document.createElement('span'); t.className='tag'; t.textContent=e.Langue; tags.appendChild(t);} 
     const link = document.createElement('a'); link.href = e.Link||'#'; link.target='_blank'; link.className='small'; link.style.display='inline-block'; link.style.marginTop='8px'; link.textContent='Voir la source ↗';
     body.appendChild(title); body.appendChild(desc); body.appendChild(tags); body.appendChild(link);
     wrap.appendChild(meta); wrap.appendChild(body);
@@ -172,22 +176,30 @@ function createEventCard(e){
 function searchEvents(){
     const interest = interestSelect.value.trim();
     const query = searchInput.value.trim();
-    const startDate = dateStartInput.value; const endDate = dateEndInput.value;
+    const startDate = dateStartInput.value; 
+    const endDate = dateEndInput.value;
 
-    // Smart search
-    let urlEvents = `/api/smart-search?`;
-    urlEvents += `q=${encodeURIComponent(query || '')}&`; // toujours envoyer q
-    if(interest) urlEvents += `interests=${encodeURIComponent(interest)}&`;
-    if(startDate) urlEvents += `start_date=${encodeURIComponent(startDate)}&`;
-    if(endDate) urlEvents += `end_date=${encodeURIComponent(endDate)}&`;
-    if(sortByDate) urlEvents += `sort=date`;
+    // Créer params dynamiquement : on n'envoie start/end que si elles existent
+    let params = [];
+    if(query) params.push(`q=${encodeURIComponent(query)}`);
+    if(interest) params.push(`interests=${encodeURIComponent(interest)}`);
+    if(startDate) params.push(`start_date=${encodeURIComponent(startDate)}`);
+    if(endDate) params.push(`end_date=${encodeURIComponent(endDate)}`);
+    if(sortByDate) params.push(`sort=date`);
+
+    let urlEvents = `/api/smart-search?${params.join('&')}`;
 
     fetch(urlEvents).then(r=>r.json()).then(events=>{
         eventListContainer.innerHTML=''; markersLayer.clearLayers();
-        if(!events || !events.length){ eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; cityResultsContainer.innerHTML='<div class="small">-</div>'; return; }
+        if(!events || !events.length){ 
+            eventListContainer.innerHTML='<div class="small">Aucun événement trouvé.</div>'; 
+            cityResultsContainer.innerHTML='<div class="small">-</div>'; 
+            return; 
+        }
         events.slice(0,60).forEach(ev=>{
             eventListContainer.appendChild(createEventCard(ev));
-            if(ev.lat && ev.lon){ const m = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
+            if(ev.lat && ev.lon){ 
+                const m = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
                 m.bindPopup(`<strong>${ev.EventName||'Sans titre'}</strong><br>${ev.Category||''}<br>${ev.City||''}<br>${formatDateDynamic(ev)}<br><a href='${ev.Link||'#'}' target='_blank'>Voir ↗</a>`);
             }
         });
@@ -195,16 +207,19 @@ function searchEvents(){
     });
 
     // Cities
-    let urlCities = `/api/cities-by-llm?`;
-    urlCities += `q=${encodeURIComponent(query || '')}&`; // toujours envoyer q
-    if(interest) urlCities += `interests=${encodeURIComponent(interest)}&`;
-    if(startDate) urlCities += `start_date=${encodeURIComponent(startDate)}&`;
-    if(endDate) urlCities += `end_date=${encodeURIComponent(endDate)}&`;
-
+    let urlCities = `/api/cities-by-llm?${params.join('&')}`;
     fetch(urlCities).then(r=>r.json()).then(cities=>{
         cityResultsContainer.innerHTML='';
-        if(!cities || !cities.length){ cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; return; }
-        cities.slice(0,8).forEach(c=>{ const d=document.createElement('div'); d.className='city-pill'; d.innerHTML = `<span>${c.City}</span><span class='small'>${c.count}</span>`; cityResultsContainer.appendChild(d); });
+        if(!cities || !cities.length){ 
+            cityResultsContainer.innerHTML='<div class="small">Aucune ville trouvée.</div>'; 
+            return; 
+        }
+        cities.slice(0,8).forEach(c=>{
+            const d=document.createElement('div'); 
+            d.className='city-pill'; 
+            d.innerHTML = `<span>${c.City}</span><span class='small'>${c.count}</span>`; 
+            cityResultsContainer.appendChild(d); 
+        });
     });
 }
 
@@ -221,7 +236,7 @@ feather.replace();
 // initial load
 searchEvents();
 </script>
+
 </body>
 </html>
-
 
