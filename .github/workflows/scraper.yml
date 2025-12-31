@@ -1,0 +1,30 @@
+name: Scraper Mensuel
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'  # 1er du mois à 2h
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scraper + traduction
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        run: python event_pipeline_monthly_append.py
+
+      - name: Generate embeddings
+        run: python generate_embeddings.py
