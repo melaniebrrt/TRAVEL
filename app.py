@@ -5,7 +5,6 @@ import unicodedata
 import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-# from sentence_transformers import SentenceTransformer, util  # Ancien code Torch
 
 app = Flask(__name__)
 CORS(app)
@@ -53,6 +52,11 @@ if "DateTime_start" in df_events.columns:
 else:
     df_events["DateTime_start"] = pd.NaT
 
+if "DateTime_end" in df_events.columns:
+    df_events["DateTime_end"] = pd.to_datetime(df_events["DateTime_end"], errors="coerce")
+else:
+    df_events["DateTime_end"] = pd.NaT
+
 # ---------------------------------------------------------
 # 🗂 NORMALISATION CATÉGORIES
 # ---------------------------------------------------------
@@ -61,18 +65,10 @@ df_events["_cat_norm"] = df_events["Category"].apply(normalize_text)
 # ---------------------------------------------------------
 # 🤖 CHARGEMENT DES EMBEDDINGS PRÉ-CALCULÉS
 # ---------------------------------------------------------
-# Ancien code avec modèle Torch :
-# model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-# event_embeddings = model.encode(df_events['EventName'].fillna('') + ' ' + df_events['Description'].fillna(''),
-#                                 convert_to_tensor=True)
-
-# Nouveau code pour Render gratuit : embeddings pré-calculés en numpy
-# Embeddings
 event_embeddings_file = 'data/event_embeddings.npy'
 try:
     event_embeddings = np.load(event_embeddings_file)
 except FileNotFoundError:
-    import numpy as np
     event_embeddings = np.random.rand(len(df_events), 384)  # fallback
 
 # ---------------------------------------------------------
@@ -85,23 +81,18 @@ def filter_by_category(df, interests_param):
     return df[df["_cat_norm"].isin(interests)]
 
 def filter_by_date(df, start, end):
-    if "DateTime_start" not in df.columns:
-        return df
-
     if start:
         try:
             start = pd.to_datetime(start)
             df = df[df["DateTime_start"] >= start]
         except:
             pass
-
     if end:
         try:
             end = pd.to_datetime(end)
-            df = df[df["DateTime_start"] <= end]
+            df = df[df["DateTime_end"] <= end]
         except:
             pass
-
     return df
 
 # ---------------------------------------------------------
@@ -120,28 +111,38 @@ def api_categories():
     return jsonify(categories)
 
 # ---------------------------------------------------------
-# 🔎 API : SMART SEARCH (recherche + filtres + tri)
+# 🔎 API : SMART SEARCH (recherche libre + filtres)
 # ---------------------------------------------------------
 @app.route('/api/smart-search')
 def smart_search():
     interests = request.args.get("interests", "")
-    query = request.args.get("q", "").strip()
+    query = request.args.get("q", "").strip().lower()
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
     sort_param = request.args.get("sort", "")
 
-    df_f = filter_by_category(df_events, interests)
+    # Start avec tout le dataframe
+    df_f = df_events.copy()
+
+    # Filtre par catégorie
+    df_f = filter_by_category(df_f, interests)
+
+    # Filtre par recherche libre
+    if query:
+        df_f = df_f[df_f["EventName"].str.lower().str.contains(query) |
+                    df_f["Description"].str.lower().str.contains(query)]
+
+    # Filtre par date seulement si fourni
     df_f = filter_by_date(df_f, start_date, end_date)
 
-    if query:
-        # q_emb = model.encode(query, convert_to_tensor=True)  # ancien code Torch
-        # filt_emb = event_embeddings[df_f.index.tolist()]
-        # scores = util.cos_sim(q_emb, filt_emb)[0].cpu().numpy()
-        q_emb = np.load("query_embedding.npy") if False else np.random.rand(event_embeddings.shape[1])  # placeholder
+    # Optionnel : score embeddings si query existe
+    if query and len(df_f) > 0:
+        q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
         filt_emb = event_embeddings[df_f.index.tolist()]
         scores = cosine_similarity([q_emb], filt_emb)[0]
         df_f = df_f.iloc[np.argsort(-scores)]
 
+    # Tri par date si demandé
     if sort_param == "date" and "DateTime_start" in df_f.columns:
         df_f = df_f.sort_values("DateTime_start", ascending=True)
 
@@ -153,23 +154,17 @@ def smart_search():
 @app.route('/api/cities-by-llm')
 def cities_by_llm():
     interests = request.args.get("interests", "")
-    query = request.args.get("q", "").strip()
+    query = request.args.get("q", "").strip().lower()
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
 
-    df_f = filter_by_category(df_events, interests)
+    df_f = df_events.copy()
+    df_f = filter_by_category(df_f, interests)
+    if query:
+        df_f = df_f[df_f["EventName"].str.lower().str.contains(query) |
+                    df_f["Description"].str.lower().str.contains(query)]
     df_f = filter_by_date(df_f, start_date, end_date)
     df_f = df_f[df_f["City"].astype(str).str.strip() != ""]
-
-    if query:
-        # Ancien code Torch
-        # q_emb = model.encode(query, convert_to_tensor=True)
-        # filt_emb = event_embeddings[df_f.index.tolist()]
-        # scores = util.cos_sim(q_emb, filt_emb)[0].cpu().numpy()
-        q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
-        filt_emb = event_embeddings[df_f.index.tolist()]
-        scores = cosine_similarity([q_emb], filt_emb)[0]
-        df_f = df_f.iloc[np.argsort(-scores)]
 
     city_counts = (
         df_f.groupby("City", as_index=False)
@@ -186,7 +181,7 @@ def cities_by_llm():
 def events_by_city():
     city = request.args.get("city", "").strip()
     interests = request.args.get("interests", "")
-    query = request.args.get("q", "").strip()
+    query = request.args.get("q", "").strip().lower()
     start_date = request.args.get("start_date", "")
     end_date = request.args.get("end_date", "")
     sort_param = request.args.get("sort", "")
@@ -196,17 +191,10 @@ def events_by_city():
 
     df_f = df_events[df_events["City"].astype(str).str.lower().str.strip() == city.lower()]
     df_f = filter_by_category(df_f, interests)
-    df_f = filter_by_date(df_f, start_date, end_date)
-
     if query:
-        # Ancien code Torch
-        # q_emb = model.encode(query, convert_to_tensor=True)
-        # filt_emb = event_embeddings[df_f.index.tolist()]
-        # scores = util.cos_sim(q_emb, filt_emb)[0].cpu().numpy()
-        q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
-        filt_emb = event_embeddings[df_f.index.tolist()]
-        scores = cosine_similarity([q_emb], filt_emb)[0]
-        df_f = df_f.iloc[np.argsort(-scores)]
+        df_f = df_f[df_f["EventName"].str.lower().str.contains(query) |
+                    df_f["Description"].str.lower().str.contains(query)]
+    df_f = filter_by_date(df_f, start_date, end_date)
 
     if sort_param == "date" and "DateTime_start" in df_f.columns:
         df_f = df_f.sort_values("DateTime_start", ascending=True)
