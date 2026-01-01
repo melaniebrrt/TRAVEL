@@ -5,7 +5,7 @@ import unicodedata
 import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
+
 
 app = Flask(__name__)
 CORS(app)
