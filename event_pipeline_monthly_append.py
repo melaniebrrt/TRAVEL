@@ -1,4 +1,41 @@
+import subprocess
+import sys
+import os
 
+# --- 🛠️ AUTO-RÉPARATION : INSTALLATION DES DÉPENDANCES ---
+def install(package):
+    print(f"🔧 Installation automatique de : {package}...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+try:
+    import pandas
+except ImportError:
+    install("pandas")
+
+try:
+    import googletrans
+except ImportError:
+    install("googletrans==4.0.0rc1")
+
+try:
+    from serpapi import GoogleSearch
+except ImportError:
+    install("google-search-results")
+    from serpapi import GoogleSearch  # On réessaie l'import après installation
+
+try:
+    from geopy.geocoders import Nominatim
+except ImportError:
+    install("geopy")
+# -------------------------------------------------------
+
+import csv
+from dateutil.parser import parse
+import time
+import json
+import random
+
+# ... LE RESTE DE TON CODE RESTE PAREIL EN DESSOUS ...
 
 from serpapi import GoogleSearch
 import os
