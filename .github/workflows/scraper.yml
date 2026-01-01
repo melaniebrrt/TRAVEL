@@ -18,16 +18,25 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies
+      - name: Create virtual environment & install dependencies
         run: |
+          python -m venv venv  # crée un environnement virtuel
+          source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install serpapi  # ⚡ Installation explicite pour éviter l'erreur
+          pip install serpapi  # toujours s'assurer que serpapi est installé
+        shell: bash
 
       - name: Run scraper + traduction
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
-        run: python event_pipeline_monthly_append.py
+        run: |
+          source venv/bin/activate
+          python event_pipeline_monthly_append.py
+        shell: bash
 
       - name: Generate embeddings
-        run: python generate_embeddings.py
+        run: |
+          source venv/bin/activate
+          python generate_embeddings.py
+        shell: bash
