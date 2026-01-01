@@ -1,3 +1,5 @@
+
+
 from serpapi import GoogleSearch
 import os
 import csv
@@ -6,18 +8,25 @@ from geopy.geocoders import Nominatim
 from googletrans import Translator
 import time
 import json
+import random
 
 # -------------------------------
-# CONFIGURATION POUR 150 REQUÊTES MAX
+# CONFIGURATION
 # -------------------------------
-API_KEY = os.getenv("SERPAPI_API_KEY") or "TA_CLE_API_ICI"
-if API_KEY == "TA_CLE_API_ICI":
-    raise ValueError("❌ Remplace TA_CLE_API_ICI par ta clé API ou définis SERPAPI_API_KEY.")
+API_KEY = os.getenv("SERPAPI_API_KEY")
 
-MAX_EVENTS = 5          # max événements par type
-TYPES_PER_CITY = 9      # 16 villes x 9 types = 144 requêtes max
+if not API_KEY:
+    # Pour tester en local sans variable d'env, décommente la ligne suivante :
+    # API_KEY = "TA_CLE_API_ICI"
+    pass
 
-# Villes (Londres inclus)
+if not API_KEY or API_KEY == "TA_CLE_API_ICI":
+    raise ValueError("❌ Erreur : La clé SERPAPI_API_KEY est manquante.")
+
+MAX_EVENTS = 5          
+TYPES_PER_CITY = 9      
+
+# Villes
 villes = [
     {"name": "London", "location": "London, United Kingdom", "gl": "uk", "hl": "en"},
     {"name": "Berlin", "location": "Berlin, Germany", "gl": "de", "hl": "de"},
@@ -37,7 +46,7 @@ villes = [
     {"name":"Dublin", "location":"Dublin, Ireland", "gl":"ie", "hl":"en"},
 ]
 
-# Types d'événements par langue (9 max)
+# Types d'événements
 event_types_by_lang = {
     "fr": ["concerts","expositions","marchés","festivals","théâtre","spectacles de danse",
            "opéra","comédies musicales","foires"],
@@ -62,41 +71,54 @@ event_types_by_lang = {
     "ie": ["concerts","exhibitions","markets","festivals","theater","dance shows",
            "opera","musicals","fairs"]
 }
+# Ajout de fallbacks simples si une langue manque
+if "it" not in event_types_by_lang: event_types_by_lang["it"] = event_types_by_lang["en"]
 
 # -------------------------------
-# INIT
+# INIT ET UTILITAIRES
 # -------------------------------
+# Création du dossier data s'il n'existe pas (CRUCIAL)
+os.makedirs("data", exist_ok=True)
+
 translator = Translator()
-geolocator = Nominatim(user_agent="event_scraper_monthly_append")
+geolocator = Nominatim(user_agent="event_scraper_monthly_bot_v1")
 geo_cache_file = "data/geo_cache.json"
 output_file = "data/events_monthly.csv"
 
 # Charger cache géoloc
-try:
+if os.path.exists(geo_cache_file):
     with open(geo_cache_file, "r", encoding="utf-8") as f:
-        geo_cache = json.load(f)
-except:
+        try:
+            geo_cache = json.load(f)
+        except json.JSONDecodeError:
+            geo_cache = {}
+else:
     geo_cache = {}
 
-# Charger CSV existant pour éviter duplicats
+# Charger CSV existant
 existing_links = set()
 if os.path.exists(output_file):
     with open(output_file, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            existing_links.add(row["Link"])
+            if "Link" in row:
+                existing_links.add(row["Link"])
 
 def save_geo_cache():
     with open(geo_cache_file, "w", encoding="utf-8") as f:
         json.dump(geo_cache, f, ensure_ascii=False, indent=2)
 
 def translate_fr(text):
+    """Traduction robuste : retourne le texte original si Google échoue"""
     if not text:
         return ""
     try:
+        # Petit délai aléatoire pour éviter le ban IP Google
+        time.sleep(random.uniform(0.1, 0.5)) 
         return translator.translate(text, src='auto', dest='fr').text
-    except:
-        return text
+    except Exception as e:
+        print(f"⚠️ Traduction échouée pour '{text[:15]}...': {e}")
+        return text # Fallback sur l'original
 
 def geolocate(address):
     if not address:
@@ -104,16 +126,17 @@ def geolocate(address):
     if address in geo_cache:
         return geo_cache[address]
     try:
-        location = geolocator.geocode(address)
+        time.sleep(1.5) # Nominatim demande 1 req/sec max
+        location = geolocator.geocode(address, timeout=10)
         if location:
             latlon = (location.latitude, location.longitude)
             geo_cache[address] = latlon
             save_geo_cache()
             return latlon
-    except:
-        pass
+    except Exception as e:
+        print(f"⚠️ Erreur géoloc: {e}")
+    
     geo_cache[address] = (None, None)
-    save_geo_cache()
     return None, None
 
 def parse_date_range(date_str):
@@ -131,11 +154,16 @@ def parse_date_range(date_str):
 # -------------------------------
 # SCRIPT PRINCIPAL
 # -------------------------------
+print("🚀 Démarrage du scraper...")
+
 file_exists = os.path.exists(output_file)
+
+# On ouvre en mode 'a' (append)
 with open(output_file, "a", newline="", encoding="utf-8") as csvfile:
     writer = csv.writer(csvfile)
+    
+    # Si le fichier est vide ou nouveau, on écrit l'en-tête
     if not file_exists or os.path.getsize(output_file) == 0:
-        # Ajouter en-tête si CSV vide ou inexistant
         writer.writerow([
             "Source","Category","EventName","DateTime","City","VenueName","Address","Link","Description",
             "DateTime_start","DateTime_end","Jour_start","Mois_start","Annee_start","Heure_start","Heure_end",
@@ -143,11 +171,12 @@ with open(output_file, "a", newline="", encoding="utf-8") as csvfile:
         ])
 
     for ville in villes:
-        types = event_types_by_lang.get(ville["hl"], ["concerts"])[:TYPES_PER_CITY]
+        lang_key = ville.get("hl", "en")
+        types = event_types_by_lang.get(lang_key, event_types_by_lang["en"])[:TYPES_PER_CITY]
 
         for event_type in types:
             query = f"{event_type} in {ville['name']}"
-            print(f"\n🔍 Recherche: '{event_type}' à {ville['name']}")
+            print(f"🔍 {ville['name']}: {event_type}")
 
             params = {
                 "engine": "google_events",
@@ -156,47 +185,43 @@ with open(output_file, "a", newline="", encoding="utf-8") as csvfile:
                 "location": ville["location"],
                 "gl": ville["gl"],
                 "hl": ville["hl"],
-                "start": 0
             }
 
             try:
                 search = GoogleSearch(params)
                 results = search.get_dict()
+                events = results.get("events_results", [])[:MAX_EVENTS]
             except Exception as e:
-                print(f"❌ Erreur SerpApi: {e}")
+                print(f"❌ Erreur SerpApi pour {query}: {e}")
                 continue
 
-            events = results.get("events_results", [])[:MAX_EVENTS]
-            if not events:
-                continue
-
+            count_new = 0
             for ev in events:
                 link = ev.get("link", "")
                 if link in existing_links:
-                    continue  # déjà présent
+                    continue
+                
                 existing_links.add(link)
-
-                title = translate_fr(ev.get("title", ""))
-                description = translate_fr(ev.get("description", ""))
-                venue_name = translate_fr(", ".join(ev.get("address", [])))
-                category_fr = translate_fr(event_type)
-                city = ville["name"]
+                
+                # Extraction
+                title_orig = ev.get("title", "")
+                desc_orig = ev.get("description", "")
+                venue_list = ev.get("address", [])
+                venue_name = ", ".join(venue_list) if isinstance(venue_list, list) else venue_list
                 date_str = ev.get("date", {}).get("when", "")
-
+                
+                # Traitement
+                title = translate_fr(title_orig)
+                description = translate_fr(desc_orig)
+                # On ne traduit pas le nom du lieu pour aider la géoloc
+                category_fr = translate_fr(event_type)
+                
                 dt_start, dt_end, duration_h = parse_date_range(date_str)
                 lat, lon = geolocate(venue_name)
-                time.sleep(1)  # pause Nominatim
 
-                writer.writerow([
-                    "SerpApi",
-                    category_fr,
-                    title,
-                    date_str,
-                    city,
-                    venue_name,
-                    venue_name,
-                    link,
-                    description,
+                row = [
+                    "SerpApi", category_fr, title, date_str, ville["name"],
+                    venue_name, venue_name, link, description,
                     dt_start.isoformat() if dt_start else "",
                     dt_end.isoformat() if dt_end else "",
                     dt_start.day if dt_start else "",
@@ -204,10 +229,17 @@ with open(output_file, "a", newline="", encoding="utf-8") as csvfile:
                     dt_start.year if dt_start else "",
                     dt_start.hour if dt_start else "",
                     dt_end.hour if dt_end else "",
-                    lat,
-                    lon,
+                    lat, lon,
                     round(duration_h,2) if duration_h else "",
                     category_fr
-                ])
+                ]
+                
+                writer.writerow(row)
+                count_new += 1
+                # Flush pour écrire physiquement sur le disque immédiatement
+                csvfile.flush() 
+            
+            if count_new > 0:
+                print(f"   ✅ {count_new} nouveaux événements ajoutés.")
 
-print(f"\n🎯 Pipeline terminé. '{output_file}' mis à jour avec les nouveaux événements.")
+print(f"\n🎯 Terminé. Données sauvegardées dans {output_file}")
