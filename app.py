@@ -6,7 +6,6 @@ import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-
 app = Flask(__name__)
 CORS(app)
 
@@ -56,11 +55,9 @@ else:
 df_events['_cat_norm'] = df_events['Category'].apply(normalize_text)
 
 # ---------------------------------------------------------
-# 🤖 EMBEDDINGS PRÉ-CALCULÉS
+# 🤖 EMBEDDINGS PRÉ-CALCULÉS (sans PyTorch ni sentence-transformers)
 # ---------------------------------------------------------
-model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 EMBEDDINGS_ENABLED = False
-
 try:
     event_embeddings = np.load('event_embeddings.npy')
     if len(event_embeddings) != len(df_events):
@@ -120,9 +117,9 @@ def smart_search():
     if query:
         if EMBEDDINGS_ENABLED and not df_f.empty:
             df_f = df_f.reset_index()
-            q_emb = model.encode([query])
+            q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
             filt_emb = event_embeddings[df_f['index'].values]
-            scores = cosine_similarity(q_emb, filt_emb)[0]
+            scores = cosine_similarity([q_emb], filt_emb)[0]
             df_f['score'] = scores
             df_f = df_f.sort_values('score', ascending=False)
         else:
@@ -144,9 +141,9 @@ def cities_by_llm():
     if query:
         if EMBEDDINGS_ENABLED and not df_f.empty:
             df_f = df_f.reset_index()
-            q_emb = model.encode([query])
+            q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
             filt_emb = event_embeddings[df_f['index'].values]
-            scores = cosine_similarity(q_emb, filt_emb)[0]
+            scores = cosine_similarity([q_emb], filt_emb)[0]
             df_f['score'] = scores
             df_f = df_f.sort_values('score', ascending=False)
         else:
@@ -183,9 +180,9 @@ def events_by_city():
     if query:
         if EMBEDDINGS_ENABLED and not df_f.empty:
             df_f = df_f.reset_index()
-            q_emb = model.encode([query])
+            q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
             filt_emb = event_embeddings[df_f['index'].values]
-            scores = cosine_similarity(q_emb, filt_emb)[0]
+            scores = cosine_similarity([q_emb], filt_emb)[0]
             df_f['score'] = scores
             df_f = df_f.sort_values('score', ascending=False)
         else:
