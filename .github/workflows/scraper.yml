@@ -1,0 +1,49 @@
+name: Scraper Mensuel
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # C'est ici que tout se joue : on installe ET on lance dans le même bloc
+      - name: Install and Run
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        run: |
+          echo "🚧 DÉBUT DE L'INSTALLATION..."
+          python -m pip install --upgrade pip
+          
+          # On force l'installation de la librairie manquante
+          pip install google-search-results
+          
+          # On installe le reste
+          pip install pandas googletrans==4.0.0rc1 geopy python-dateutil requests
+
+          echo "✅ INSTALLATION TERMINÉE. VÉRIFICATION :"
+          pip list | grep google
+          
+          echo "🚀 LANCEMENT DU SCRIPT PYTHON..."
+          python event_pipeline_monthly_append.py
+
+      - name: Commit and Push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 New events data added"
+          file_pattern: "data/*"
