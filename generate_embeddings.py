@@ -2,7 +2,7 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 
 # Charger ton CSV
-df = pd.read_csv("df_final_trad.csv")
+df = pd.read_csv("csv_fusionne.csv")
 
 # Charger le modèle
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
