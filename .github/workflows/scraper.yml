@@ -1,4 +1,4 @@
-name: Scraper Mensuel Verbose
+name: Scraper Mensuel
 
 on:
   schedule:
@@ -23,26 +23,21 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --force-reinstall --no-cache-dir -r requirements.txt
+          pip install --no-cache-dir -r requirements.txt
+          # Installer explicitement SerpApi au cas où
+          pip install --no-cache-dir google-search-results
 
-      # 4️⃣ Vérifier tous les packages installés
-      - name: List installed packages
+      # 4️⃣ Vérifier que SerpApi est installé correctement
+      - name: Test SerpApi import
         run: |
-          echo "📦 Liste des packages installés :"
-          python -m pip list
-          echo "✅ SerpApi devrait apparaître ici"
-      
-      # 5️⃣ Tester l'import de SerpApi
-      - name: Check SerpApi import
-        run: |
-          python -c "import serpapi; print('✅ SerpApi importé correctement !')"
+          python -c "from serpapi import GoogleSearch; print('✅ SerpApi fonctionne')"
 
-      # 6️⃣ Lancer le scraper avec la clé SerpAPI
+      # 5️⃣ Lancer le scraper avec la clé SerpAPI
       - name: Run scraper + traduction
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: python event_pipeline_monthly_append.py
 
-      # 7️⃣ Générer les embeddings
+      # 6️⃣ Générer les embeddings
       - name: Generate embeddings
-        run: python generate_embeddings.py flask
+        run: python generate_embeddings.py
