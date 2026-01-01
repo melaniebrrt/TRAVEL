@@ -2,58 +2,48 @@ name: Scraper Mensuel
 
 on:
   schedule:
-    - cron: '0 2 1 * *'  # 1er du mois à 2h
-  workflow_dispatch:      # Permet de lancer manuellement pour tester
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write         # ⚠️ OBLIGATOIRE pour pouvoir sauvegarder le CSV
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Récupérer le repo
-      - uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      # 2️⃣ Installer Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: '3.11'
+          cache: 'pip'
 
-      # 3️⃣ Mettre à jour pip et installer les dépendances
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # On installe explicitement la librairie qui pose problème
-          pip install google-search-results
-          # On installe les autres outils nécessaires
-          pip install pandas googletrans==4.0.0rc1 geopy python-dateutil requests
-          # Si tu as un requirements.txt, on l'installe aussi, mais on ignore l'erreur s'il manque
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      # 4️⃣ Vérification (DEBUG) - Pour être sûr que c'est bien là
-      - name: Debug installed packages
-        run: pip list | grep google
-
-      # 5️⃣ Lancer le scraper (avec installation forcée juste avant)
-      - name: Run scraper + traduction
+      # C'est ici que tout se joue : on installe ET on lance dans le même bloc
+      - name: Install and Run
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
-          echo "Installation de sécurité..."
-          pip install google-search-results pandas googletrans==4.0.0rc1 geopy python-dateutil
+          echo "🚧 DÉBUT DE L'INSTALLATION..."
+          python -m pip install --upgrade pip
           
-          echo "Vérification de l'installation :"
-          pip show google-search-results
+          # On force l'installation de la librairie manquante
+          pip install google-search-results
           
-          echo "Lancement du script..."
+          # On installe le reste
+          pip install pandas googletrans==4.0.0rc1 geopy python-dateutil requests
+
+          echo "✅ INSTALLATION TERMINÉE. VÉRIFICATION :"
+          pip list | grep google
+          
+          echo "🚀 LANCEMENT DU SCRIPT PYTHON..."
           python event_pipeline_monthly_append.py
 
-      # 6️⃣ SAUVEGARDER LES RÉSULTATS (C'est ça qu'il manquait !)
-      - name: Commit and Push changes
+      - name: Commit and Push
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "🤖 Update monthly events data"
-          file_pattern: "data/*.csv data/*.json" # On ne sauvegarde que les données
+          commit_message: "🤖 New events data added"
+          file_pattern: "data/*"
