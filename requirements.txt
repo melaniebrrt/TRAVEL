@@ -4,3 +4,5 @@ pandas
 numpy
 scikit-learn
 gunicorn
+sentence-transformers>=2.2.2
+torch>=2.0
