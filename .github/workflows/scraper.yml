@@ -10,26 +10,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      # 🔹 Récupérer le repo
+      - uses: actions/checkout@v3
 
+      # 🔹 Installer Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Upgrade pip & install dependencies
+      # 🔹 Installer les dépendances
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test SerpAPI import
-        run: python -c "from serpapi import GoogleSearch; print('✅ SerpAPI OK')"
+      # 🔹 Vérifier l'installation de google-search-results
+      - name: Check SerpAPI module
+        run: |
+          python -c "from serpapi import GoogleSearch; print('✅ SerpAPI module OK')"
 
+      # 🔹 Lancer le scraper et traduction
       - name: Run scraper + traduction
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: python event_pipeline_monthly_append.py
 
+      # 🔹 Générer les embeddings
       - name: Generate embeddings
         run: python generate_embeddings.py
+
