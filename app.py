@@ -37,15 +37,9 @@ if missing:
     print("ERREUR colonnes manquantes:", missing)
     exit()
 
-# Nettoyage lat/lon
 df_events['lat'] = pd.to_numeric(df_events['lat'], errors='coerce')
 df_events['lon'] = pd.to_numeric(df_events['lon'], errors='coerce')
 df_events.fillna('', inplace=True)
-
-# Remplir valeurs manquantes pour éviter affichage vide
-df_events['EventName'] = df_events['EventName'].fillna('Sans titre')
-df_events['Description'] = df_events['Description'].fillna('Pas de description')
-df_events['City'] = df_events['City'].fillna('N/A')
 
 # Dates
 if "DateTime_start" in df_events.columns:
@@ -63,8 +57,8 @@ def filter_by_category(df, interests_param):
     if not interests_param:
         return df
     interests = [normalize_text(i) for i in interests_param.split(',') if i.strip()]
-    # filtrage tolérant : contient au moins un des mots-clés
-    return df[df["_cat_norm"].apply(lambda x: any(i in x for i in interests))]
+    # ✅ Fix : comparaison exacte normalisée
+    return df[df["_cat_norm"].isin(interests)]
 
 def filter_by_date(df, start, end):
     if "DateTime_start" not in df.columns:
@@ -161,3 +155,4 @@ def cities_by_llm():
 if __name__ == "__main__":
     print("Serveur OK ➜ http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
+
