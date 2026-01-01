@@ -6,3 +6,6 @@ scikit-learn
 gunicorn
 geopy
 googletrans==4.0.0rc1
+google-search-results
+python-dateutil
+
