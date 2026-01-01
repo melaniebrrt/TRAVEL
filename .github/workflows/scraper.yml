@@ -22,18 +22,20 @@ jobs:
         with:
           python-version: 3.11
 
-      # 3️⃣ Installer dépendances
+      # 3️⃣ Mettre à jour pip et installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --no-cache-dir -r requirements.txt
-          pip install --no-cache-dir google-search-results
+          # On installe explicitement la librairie qui pose problème
+          pip install google-search-results
+          # On installe les autres outils nécessaires
+          pip install pandas googletrans==4.0.0rc1 geopy python-dateutil requests
+          # Si tu as un requirements.txt, on l'installe aussi, mais on ignore l'erreur s'il manque
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # 4️⃣ Lancer le scraper
-      - name: Run scraper + traduction
-        env:
-          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
-        run: python event_pipeline_monthly_append.py
+      # 4️⃣ Vérification (DEBUG) - Pour être sûr que c'est bien là
+      - name: Debug installed packages
+        run: pip list | grep google
 
       # 5️⃣ (Optionnel) Générer les embeddings
       # - name: Generate embeddings
