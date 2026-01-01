@@ -4,7 +4,3 @@ pandas
 numpy
 scikit-learn
 gunicorn
-geopy
-googletrans==4.0.0rc1
-python-dateutil
-google-search-results
