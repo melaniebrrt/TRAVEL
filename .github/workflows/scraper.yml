@@ -17,16 +17,18 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies & Run scraper
+      - name: Install dependencies & Run scripts
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
           # Mise à jour de pip
           python -m pip install --upgrade pip
 
-          # Installer toutes les dépendances, y compris serpapi
+          # Installer toutes les dépendances d'un coup
           pip install -r requirements.txt
-          pip install serpapi
+
+          # Vérifier que serpapi est installé
+          python -c "import serpapi; print('✅ SerpApi OK')"
 
           # Lancer le scraper
           python event_pipeline_monthly_append.py
