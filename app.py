@@ -3,7 +3,6 @@ import pandas as pd
 from flask_cors import CORS
 import unicodedata
 import re
-import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -31,29 +30,24 @@ except FileNotFoundError:
     print(f"ERREUR: Le fichier '{csv_file}' est introuvable.")
     exit()
 
-# Vérification colonnes essentielles
+# Colonnes essentielles
 required_cols = ['lat', 'lon', 'Category', 'City', 'Description', 'EventName']
 missing = [c for c in required_cols if c not in df_events.columns]
 if missing:
     print("ERREUR colonnes manquantes:", missing)
     exit()
 
-# Nettoyage lat/lon
 df_events['lat'] = pd.to_numeric(df_events['lat'], errors='coerce')
 df_events['lon'] = pd.to_numeric(df_events['lon'], errors='coerce')
 df_events.fillna('', inplace=True)
 
-# ---------------------------------------------------------
-# 📅 CONVERSION DES DATES
-# ---------------------------------------------------------
+# Dates
 if "DateTime_start" in df_events.columns:
     df_events["DateTime_start"] = pd.to_datetime(df_events["DateTime_start"], errors="coerce")
 else:
     df_events["DateTime_start"] = pd.NaT
 
-# ---------------------------------------------------------
-# 🗂 NORMALISATION CATÉGORIES
-# ---------------------------------------------------------
+# Normalisation catégories
 df_events["_cat_norm"] = df_events["Category"].apply(normalize_text)
 
 # ---------------------------------------------------------
@@ -63,26 +57,24 @@ def filter_by_category(df, interests_param):
     if not interests_param:
         return df
     interests = [normalize_text(i) for i in interests_param.split(',') if i.strip()]
-    return df[df["_cat_norm"].isin(interests)]
+    # Filtrage tolérant (subset) pour éviter que zéro événement apparaisse
+    return df[df["_cat_norm"].apply(lambda x: any(i in x for i in interests))]
 
 def filter_by_date(df, start, end):
     if "DateTime_start" not in df.columns:
         return df
-
     if start:
         try:
             start = pd.to_datetime(start)
             df = df[df["DateTime_start"] >= start]
         except:
             pass
-
     if end:
         try:
             end = pd.to_datetime(end)
             df = df[df["DateTime_start"] <= end]
         except:
             pass
-
     return df
 
 # ---------------------------------------------------------
@@ -112,7 +104,6 @@ def smart_search():
     sort_param = request.args.get("sort", "")
 
     df_f = df_events.copy()
-
     df_f = filter_by_category(df_f, interests)
     df_f = filter_by_date(df_f, start_date, end_date)
 
