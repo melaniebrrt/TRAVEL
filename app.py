@@ -148,31 +148,29 @@ def smart_search():
 # ---------------------------------------------------------
 @app.route('/api/cities-by-llm')
 def cities_by_llm():
-    interests = request.args.get("interests", "")
-    query = request.args.get("q", "").strip()
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
+    interests = request.args.get("interests", "").strip()
+    query = request.args.get("q", "").strip().lower()
 
-    df_f = filter_by_category(df_events, interests)
-    df_f = filter_by_date(df_f, start_date, end_date)
-    df_f = df_f[df_f["City"].astype(str).str.strip() != ""]
+    df_f = df_events.copy()
+
+    if interests:
+        df_f = df_f[df_f["_cat_norm"] == normalize_text(interests)]
 
     if query:
-        # Ancien code Torch
-        # q_emb = model.encode(query, convert_to_tensor=True)
-        # filt_emb = event_embeddings[df_f.index.tolist()]
-        # scores = util.cos_sim(q_emb, filt_emb)[0].cpu().numpy()
-        q_emb = np.random.rand(event_embeddings.shape[1])  # placeholder
-        filt_emb = event_embeddings[df_f.index.tolist()]
-        scores = cosine_similarity([q_emb], filt_emb)[0]
-        df_f = df_f.iloc[np.argsort(-scores)]
+        df_f = df_f[
+            df_f["EventName"].str.lower().str.contains(query, na=False) |
+            df_f["Description"].str.lower().str.contains(query, na=False)
+        ]
+
+    df_f = df_f[df_f["City"].astype(str).str.strip() != ""]
 
     city_counts = (
         df_f.groupby("City", as_index=False)
-            .size()
-            .rename(columns={"size": "count"})
-            .sort_values("count", ascending=False)
+        .size()
+        .rename(columns={"size": "count"})
+        .sort_values("count", ascending=False)
     )
+
     return jsonify(city_counts.to_dict("records"))
 
 # ---------------------------------------------------------
