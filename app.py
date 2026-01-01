@@ -26,7 +26,7 @@ def normalize_text(s: str) -> str:
 # ---------------------------------------------------------
 # 📥 CHARGEMENT CSV
 # ---------------------------------------------------------
-csv_file = 'df_final_trad.csv'
+csv_file = 'csv_fusionne.csv'
 try:
     df_events = pd.read_csv(csv_file)
 except FileNotFoundError:
