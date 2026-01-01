@@ -8,18 +8,23 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Install dependencies
+      - name: Upgrade pip & install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Test SerpAPI import
+        run: python -c "from serpapi import GoogleSearch; print('✅ SerpAPI OK')"
 
       - name: Run scraper + traduction
         env:
