@@ -37,9 +37,19 @@ jobs:
       - name: Debug installed packages
         run: pip list | grep google
 
-      # 5️⃣ (Optionnel) Générer les embeddings
-      # - name: Generate embeddings
-      #   run: python generate_embeddings.py
+      # 5️⃣ Lancer le scraper (avec installation forcée juste avant)
+      - name: Run scraper + traduction
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        run: |
+          echo "Installation de sécurité..."
+          pip install google-search-results pandas googletrans==4.0.0rc1 geopy python-dateutil
+          
+          echo "Vérification de l'installation :"
+          pip show google-search-results
+          
+          echo "Lancement du script..."
+          python event_pipeline_monthly_append.py
 
       # 6️⃣ SAUVEGARDER LES RÉSULTATS (C'est ça qu'il manquait !)
       - name: Commit and Push changes
