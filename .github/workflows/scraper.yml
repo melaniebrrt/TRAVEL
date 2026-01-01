@@ -10,29 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Récupérer le repo
       - uses: actions/checkout@v3
 
+      # 2️⃣ Installer Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Install dependencies & Run scripts
+      # 3️⃣ Mettre à jour pip et installer toutes les dépendances
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+
+      # 4️⃣ Lancer le scraper avec la clé SerpAPI
+      - name: Run scraper + traduction
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
-        run: |
-          # Mise à jour de pip
-          python -m pip install --upgrade pip
+        run: python event_pipeline_monthly_append.py
 
-          # Installer toutes les dépendances d'un coup
-          pip install -r requirements.txt
-
-          # Vérifier que serpapi est installé
-          python -c "import serpapi; print('✅ SerpApi OK')"
-
-          # Lancer le scraper
-          python event_pipeline_monthly_append.py
-
-          # Générer les embeddings
-          python generate_embeddings.py
-        shell: bash
+      # 5️⃣ Générer les embeddings
+      - name: Generate embeddings
+        run: python generate_embeddings.py
