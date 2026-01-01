@@ -2,39 +2,31 @@ import subprocess
 import sys
 import os
 
-# --- 🛠️ AUTO-RÉPARATION : INSTALLATION DES DÉPENDANCES ---
-def install(package):
-    print(f"🔧 Installation automatique de : {package}...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+# --- 🚑 ZONE DE SURVIE : AUTO-INSTALLATION ---
+def install_package(package_name):
+    print(f"🔄 Installation forcée de : {package_name}...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+    except:
+        print(f"❌ Impossible d'installer {package_name}")
 
-try:
-    import pandas
-except ImportError:
-    install("pandas")
+# On vérifie et installe TOUT ce qui manque avant de commencer
+required = ["google-search-results", "pandas", "googletrans==4.0.0rc1", "geopy", "python-dateutil"]
+for lib in required:
+    try:
+        __import__(lib.replace("-", "_").replace("==4.0.0rc1", ""))
+    except ImportError:
+        install_package(lib)
+# ---------------------------------------------
 
-try:
-    import googletrans
-except ImportError:
-    install("googletrans==4.0.0rc1")
-
-try:
-    from serpapi import GoogleSearch
-except ImportError:
-    install("google-search-results")
-    from serpapi import GoogleSearch  # On réessaie l'import après installation
-
-try:
-    from geopy.geocoders import Nominatim
-except ImportError:
-    install("geopy")
-# -------------------------------------------------------
-
+# MAINTENANT on peut importer
+from serpapi import GoogleSearch
 import csv
 from dateutil.parser import parse
+from geopy.geocoders import Nominatim
+from googletrans import Translator
 import time
 import json
-import random
-
 # ... LE RESTE DE TON CODE RESTE PAREIL EN DESSOUS ...
 
 from serpapi import GoogleSearch
