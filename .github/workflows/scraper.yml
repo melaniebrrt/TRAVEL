@@ -10,33 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Create virtual environment & install dependencies
-        run: |
-          python -m venv venv  # crée un environnement virtuel
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install serpapi  # toujours s'assurer que serpapi est installé
-        shell: bash
-
-      - name: Run scraper + traduction
+      - name: Install dependencies & Run scraper
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         run: |
-          source venv/bin/activate
-          python event_pipeline_monthly_append.py
-        shell: bash
+          # Mise à jour de pip
+          python -m pip install --upgrade pip
 
-      - name: Generate embeddings
-        run: |
-          source venv/bin/activate
+          # Installer toutes les dépendances, y compris serpapi
+          pip install -r requirements.txt
+          pip install serpapi
+
+          # Lancer le scraper
+          python event_pipeline_monthly_append.py
+
+          # Générer les embeddings
           python generate_embeddings.py
         shell: bash
