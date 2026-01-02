@@ -7,9 +7,9 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-# ---------------------------------------------------------
-# 🔧 NORMALISATION TEXTE
-# ---------------------------------------------------------
+
+# NORMALISATION TEXTE
+
 def normalize_text(s: str) -> str:
     if not isinstance(s, str):
         s = str(s)
@@ -20,9 +20,9 @@ def normalize_text(s: str) -> str:
     s = re.sub(r'\s+', ' ', s)
     return s
 
-# ---------------------------------------------------------
-# 📥 CHARGEMENT CSV
-# ---------------------------------------------------------
+
+# CHARGEMENT CSV
+
 csv_file = 'csv_fusionne.csv'
 try:
     df_events = pd.read_csv(csv_file)
@@ -50,9 +50,9 @@ else:
 # Normalisation catégories (strip + lower)
 df_events["_cat_norm"] = df_events["Category"].astype(str).apply(normalize_text)
 
-# ---------------------------------------------------------
-# 🧹 FILTRES
-# ---------------------------------------------------------
+
+# FILTRES
+
 def filter_by_category(df, interests_param):
     if not interests_param:
         return df
@@ -78,24 +78,23 @@ def filter_by_date(df, start, end):
             pass
     return df
 
-# ---------------------------------------------------------
-# 🌐 ROUTE FRONT : page HTML principale
-# ---------------------------------------------------------
+
+# ROUTE FRONT : page HTML principale
+
 @app.route('/')
 def index():
     return render_template("index.html")
 
-# ---------------------------------------------------------
-# 📌 API : Liste des catégories
-# ---------------------------------------------------------
+
+# API : Liste des catégories
+
 @app.route('/api/categories')
 def api_categories():
     categories = sorted(df_events["Category"].dropna().unique().tolist())
     return jsonify(categories)
 
-# ---------------------------------------------------------
-# 🔎 API : SMART SEARCH
-# ---------------------------------------------------------
+# API : SMART SEARCH
+
 @app.route('/api/smart-search')
 def smart_search():
     interests = request.args.get("interests", "").strip()
@@ -120,9 +119,9 @@ def smart_search():
     df_f = df_f.reset_index(drop=True)
     return jsonify(df_f.to_dict("records"))
 
-# ---------------------------------------------------------
-# 🏙 API : Villes recommandées
-# ---------------------------------------------------------
+
+# API : Villes recommandées
+
 @app.route('/api/cities-by-llm')
 def cities_by_llm():
     interests = request.args.get("interests", "").strip()
@@ -149,9 +148,9 @@ def cities_by_llm():
     )
     return jsonify(city_counts.to_dict("records"))
 
-# ---------------------------------------------------------
-# 🚀 LANCEMENT
-# ---------------------------------------------------------
+
+# LANCEMENT
+
 if __name__ == "__main__":
     print("Serveur OK ➜ http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
