@@ -47,8 +47,8 @@ if "DateTime_start" in df_events.columns:
 else:
     df_events["DateTime_start"] = pd.NaT
 
-# Normalisation catégories
-df_events["_cat_norm"] = df_events["Category"].apply(normalize_text)
+# Normalisation catégories (strip + lower)
+df_events["_cat_norm"] = df_events["Category"].astype(str).apply(normalize_text)
 
 # ---------------------------------------------------------
 # 🧹 FILTRES
@@ -57,7 +57,8 @@ def filter_by_category(df, interests_param):
     if not interests_param:
         return df
     interests = [normalize_text(i) for i in interests_param.split(',') if i.strip()]
-    # ✅ Fix : comparaison exacte normalisée
+    # Strip des catégories déjà normalisées pour éviter les espaces invisibles
+    df['_cat_norm'] = df['_cat_norm'].astype(str).str.strip()
     return df[df["_cat_norm"].isin(interests)]
 
 def filter_by_date(df, start, end):
@@ -93,7 +94,7 @@ def api_categories():
     return jsonify(categories)
 
 # ---------------------------------------------------------
-# 🔎 API : SMART SEARCH (recherche + filtres + tri)
+# 🔎 API : SMART SEARCH
 # ---------------------------------------------------------
 @app.route('/api/smart-search')
 def smart_search():
@@ -107,7 +108,6 @@ def smart_search():
     df_f = filter_by_category(df_f, interests)
     df_f = filter_by_date(df_f, start_date, end_date)
 
-    # recherche texte simple
     if query:
         df_f = df_f[
             df_f["EventName"].str.lower().str.contains(query, na=False) |
@@ -155,4 +155,3 @@ def cities_by_llm():
 if __name__ == "__main__":
     print("Serveur OK ➜ http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
-
