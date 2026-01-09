@@ -10,3 +10,4 @@ google-search-results
 python-dateutil
 geopy
 googletrans==4.0.0-rc1
+ 
