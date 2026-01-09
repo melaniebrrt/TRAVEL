@@ -13,11 +13,6 @@ import pandas as pd
 bp = Blueprint("main", __name__)
 
 # -------------------------------------------------
-# Chargement des données (1 seule fois)
-# -------------------------------------------------
-df_events = load_events()
-
-# -------------------------------------------------
 # FONCTION DE FILTRAGE COMMUNE
 # -------------------------------------------------
 def apply_filters(df, args):
@@ -41,7 +36,7 @@ def apply_filters(df, args):
     if interests:
         df = filter_by_category(df, interests)
 
-    # ---------- Filtre ville (NOUVEAU) ----------
+    # ---------- Filtre ville ----------
     if city and "City" in df.columns:
         df = df[
             df["City"]
@@ -81,17 +76,23 @@ def index():
     return render_template("index.html")
 
 # -------------------------------------------------
-# API : catégories
+# API : catégories disponibles
 # -------------------------------------------------
 @bp.route("/api/categories")
 def api_categories():
+    df = load_events()
+
+    if "Category" not in df.columns:
+        return jsonify([])
+
     categories = (
-        df_events["Category"]
+        df["Category"]
         .dropna()
         .astype(str)
         .unique()
         .tolist()
     )
+
     return jsonify(sorted(categories))
 
 # -------------------------------------------------
@@ -99,10 +100,11 @@ def api_categories():
 # -------------------------------------------------
 @bp.route("/api/smart-search")
 def smart_search():
-    sort_param = request.args.get("sort", "")
-    df = apply_filters(df_events, request.args)
+    df = load_events()
+    df = apply_filters(df, request.args)
 
     # ---------- Tri par date ----------
+    sort_param = request.args.get("sort", "")
     if sort_param == "date" and "DateTime_start" in df.columns:
         df = df.sort_values("DateTime_start", ascending=True)
 
@@ -121,7 +123,8 @@ def smart_search():
 # -------------------------------------------------
 @bp.route("/api/cities-by-llm")
 def cities_by_llm():
-    df = apply_filters(df_events, request.args)
+    df = load_events()
+    df = apply_filters(df, request.args)
 
     if "City" not in df.columns:
         return jsonify([])
