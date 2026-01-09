@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const darkToggle = document.getElementById('dark-toggle');
 
   let sortByDate = false;
+  let selectedCity = null; // ⭐ ville active
 
   // ===================
   // MODE SOMBRE
@@ -46,17 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===================
-  // NORMALISATION (uniquement pour le front si nécessaire)
-  // ===================
-  function normalizeText(str) {
-    return str
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
-  }
-
-  // ===================
   // CATÉGORIES
   // ===================
   fetch('/api/categories')
@@ -65,14 +55,14 @@ document.addEventListener('DOMContentLoaded', () => {
       interestSelect.innerHTML = '<option value="">-- Tous --</option>';
       categories.forEach(cat => {
         const option = document.createElement('option');
-        option.value = cat; // <-- envoyer la valeur brute, pas normalisée
+        option.value = cat;
         option.textContent = cat;
         interestSelect.appendChild(option);
       });
     });
 
   // ===================
-  // CREATE EVENT CARD
+  // EVENT CARD
   // ===================
   function createEventCard(e) {
     const card = document.createElement('div');
@@ -82,7 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
     meta.className = 'meta';
     meta.innerHTML = `
       <div class="small">
-        ${e.DateTime_start ? new Date(e.DateTime_start).toLocaleDateString('fr-FR') : 'N/A'}
+        ${e.DateTime_start
+          ? new Date(e.DateTime_start).toLocaleDateString('fr-FR')
+          : 'N/A'}
       </div>
       <div class="small">${e.City || 'N/A'}</div>
     `;
@@ -95,7 +87,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const desc = document.createElement('p');
     desc.textContent = e.Description
-      ? (e.Description.length > 180 ? e.Description.slice(0, 180) + '…' : e.Description)
+      ? (e.Description.length > 180
+          ? e.Description.slice(0, 180) + '…'
+          : e.Description)
       : 'Pas de description.';
 
     const tags = document.createElement('div');
@@ -121,15 +115,29 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===================
-  // BUILD QUERY PARAMS
+  // QUERY PARAMS
   // ===================
-  function buildQueryParams() {
+  function buildQueryParams(includeCity = true) {
     const params = new URLSearchParams();
-    if (interestSelect.value) params.set('interests', interestSelect.value);
-    if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
+
+    if (interestSelect.value) {
+      const normalizedInterest = interestSelect.value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+      params.set('interests', normalizedInterest);
+    }
+
+    params.set('q', searchInput.value.trim() || '');
+
     if (dateStartInput.value) params.set('start_date', dateStartInput.value);
     if (dateEndInput.value) params.set('end_date', dateEndInput.value);
     if (sortByDate) params.set('sort', 'date');
+
+    if (includeCity && selectedCity) {
+      params.set('city', selectedCity);
+    }
+
     return params.toString();
   }
 
@@ -137,21 +145,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // RECHERCHE
   // ===================
   function searchEvents() {
-    const queryString = buildQueryParams();
-    const url = `/api/smart-search?${queryString}`;
 
+    // 👉 villes : TOUJOURS SANS filtre ville
     cityResultsContainer.innerHTML = '<div class="small">Chargement…</div>';
+    fetchCities(buildQueryParams(false));
+
+    // 👉 événements : AVEC filtre ville si sélectionnée
+    const url = `/api/smart-search?${buildQueryParams(true)}`;
+    eventListContainer.innerHTML = '<div class="small">Chargement…</div>';
+    markersLayer.clearLayers();
 
     fetch(url)
       .then(res => res.json())
       .then(events => {
         eventListContainer.innerHTML = '';
-        markersLayer.clearLayers();
 
-        if (!events.length) {
+        if (!events || !events.length) {
           eventListContainer.innerHTML =
             '<div class="small">Aucun événement trouvé.</div>';
-          renderCities([]);
           return;
         }
 
@@ -171,18 +182,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (markersLayer.getLayers().length) {
           map.fitBounds(markersLayer.getBounds().pad(0.15));
         }
-
-        fetchCities(queryString);
       });
   }
 
   // ===================
-  // VILLES
+  // VILLES (CLIQUABLES + SURBRILLANCE)
   // ===================
   function fetchCities(queryString) {
     fetch(`/api/cities-by-llm?${queryString}`)
       .then(res => res.json())
-      .then(renderCities);
+      .then(renderCities)
+      .catch(() => {
+        cityResultsContainer.innerHTML = '<div class="small">-</div>';
+      });
   }
 
   function renderCities(cities) {
@@ -196,37 +208,54 @@ document.addEventListener('DOMContentLoaded', () => {
     cities.slice(0, 8).forEach(c => {
       const div = document.createElement('div');
       div.className = 'city-pill';
+      div.style.cursor = 'pointer';
+
+      if (selectedCity === c.City) {
+        div.classList.add('active');
+      }
+
       div.innerHTML = `
         <span>${c.City}</span>
         <span class="small">${c.count}</span>
       `;
+
+      div.addEventListener('click', () => {
+        selectedCity = c.City;
+        searchEvents();
+      });
+
       cityResultsContainer.appendChild(div);
     });
   }
 
   // ===================
-  // UX : bouton Rechercher
-  // ===================
-  function updateSearchButtonState() {
-    searchButton.disabled = !searchInput.value.trim();
-  }
-
-  updateSearchButtonState();
-  searchInput.addEventListener('input', updateSearchButtonState);
-
-  // ===================
-  // EVENTS UI
+  // UI
   // ===================
   searchButton.addEventListener('click', searchEvents);
+
   searchInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') searchEvents();
   });
-  interestSelect.addEventListener('change', searchEvents);
-  dateStartInput.addEventListener('change', searchEvents);
-  dateEndInput.addEventListener('change', searchEvents);
+
+  interestSelect.addEventListener('change', () => {
+    selectedCity = null;
+    searchEvents();
+  });
+
+  dateStartInput.addEventListener('change', () => {
+    selectedCity = null;
+    searchEvents();
+  });
+
+  dateEndInput.addEventListener('change', () => {
+    selectedCity = null;
+    searchEvents();
+  });
 
   feather.replace();
+
+  // ===================
+  // CHARGEMENT INITIAL
+  // ===================
   searchEvents();
-
 });
-
