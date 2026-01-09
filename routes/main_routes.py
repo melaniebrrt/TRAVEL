@@ -25,6 +25,7 @@ def apply_filters(df, args):
     Applique les filtres communs :
     - intérêts / catégorie
     - recherche texte
+    - ville
     - dates
     """
     df = df.copy()
@@ -32,25 +33,39 @@ def apply_filters(df, args):
     # ---------- Paramètres ----------
     interests = args.get("interests", "")
     query = normalize_text(args.get("q", ""))
+    city = normalize_text(args.get("city", ""))
     start_date = args.get("start_date", "")
     end_date = args.get("end_date", "")
 
-    # ---------- Filtre catégorie (robuste) ----------
+    # ---------- Filtre catégorie ----------
     if interests:
         df = filter_by_category(df, interests)
+
+    # ---------- Filtre ville (NOUVEAU) ----------
+    if city and "City" in df.columns:
+        df = df[
+            df["City"]
+            .astype(str)
+            .apply(normalize_text)
+            .str.contains(city, na=False)
+        ]
 
     # ---------- Recherche texte ----------
     if query:
         df = df[
-            df["EventName"]
-            .astype(str)
-            .apply(normalize_text)
-            .str.contains(query, na=False)
+            (
+                df["EventName"]
+                .astype(str)
+                .apply(normalize_text)
+                .str.contains(query, na=False)
+            )
             |
-            df["Description"]
-            .astype(str)
-            .apply(normalize_text)
-            .str.contains(query, na=False)
+            (
+                df["Description"]
+                .astype(str)
+                .apply(normalize_text)
+                .str.contains(query, na=False)
+            )
         ]
 
     # ---------- Filtre dates ----------
@@ -87,11 +102,11 @@ def smart_search():
     sort_param = request.args.get("sort", "")
     df = apply_filters(df_events, request.args)
 
-    # Tri par date si demandé
+    # ---------- Tri par date ----------
     if sort_param == "date" and "DateTime_start" in df.columns:
         df = df.sort_values("DateTime_start", ascending=True)
 
-    # Sérialisation des dates
+    # ---------- Sérialisation des dates ----------
     if "DateTime_start" in df.columns:
         df["DateTime_start"] = (
             df["DateTime_start"]
