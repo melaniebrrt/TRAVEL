@@ -108,13 +108,11 @@ def smart_search():
     if sort_param == "date" and "DateTime_start" in df.columns:
         df = df.sort_values("DateTime_start", ascending=True)
 
-    # ---------- Sérialisation des dates ----------
-    if "DateTime_start" in df.columns:
-        df["DateTime_start"] = (
-            df["DateTime_start"]
-            .where(df["DateTime_start"].notna(), None)
-            .astype(str)
-        )
+    # ---------- Nettoyage JSON (CRUCIAL) ----------
+    df = df.where(pd.notna(df), None)
+
+    # ---------- Limite affichage (performance) ----------
+    df = df.head(500)
 
     return jsonify(df.to_dict(orient="records"))
 
@@ -143,3 +141,4 @@ def cities_by_llm():
     )
 
     return jsonify(city_counts.to_dict(orient="records"))
+
