@@ -8,6 +8,35 @@ from utils.data_utils import (
 import pandas as pd
 
 # -------------------------------------------------
+# TRADUCTION DES CATÉGORIES (AFFICHAGE)
+# -------------------------------------------------
+CATEGORY_TRANSLATIONS = {
+    "concert": "Concerts",
+    "concerts": "Concerts",
+    "exhibition": "Expositions",
+    "exhibitions": "Expositions",
+    "market": "Marchés",
+    "markets": "Marchés",
+    "festival": "Festivals",
+    "festivals": "Festivals",
+    "theater": "Théâtre",
+    "theatre": "Théâtre",
+    "dance show": "Spectacles de danse",
+    "dance shows": "Spectacles de danse",
+    "opera": "Opéra",
+    "musical": "Comédies musicales",
+    "musicals": "Comédies musicales",
+    "fair": "Foires",
+    "fairs": "Foires",
+    "flea market": "Brocantes",
+    "flea markets": "Brocantes",
+    "trade show": "Salons professionnels",
+    "trade shows": "Salons professionnels",
+    "christmas market": "Marchés de Noël",
+    "christmas markets": "Marchés de Noël"
+}
+
+# -------------------------------------------------
 # Blueprint principal
 # -------------------------------------------------
 bp = Blueprint("main", __name__)
@@ -16,27 +45,17 @@ bp = Blueprint("main", __name__)
 # FONCTION DE FILTRAGE COMMUNE
 # -------------------------------------------------
 def apply_filters(df, args):
-    """
-    Applique les filtres communs :
-    - intérêts / catégorie
-    - recherche texte
-    - ville
-    - dates
-    """
     df = df.copy()
 
-    # ---------- Paramètres ----------
     interests = args.get("interests", "")
     query = normalize_text(args.get("q", ""))
     city = normalize_text(args.get("city", ""))
     start_date = args.get("start_date", "")
     end_date = args.get("end_date", "")
 
-    # ---------- Filtre catégorie ----------
     if interests:
         df = filter_by_category(df, interests)
 
-    # ---------- Filtre ville ----------
     if city and "City" in df.columns:
         df = df[
             df["City"]
@@ -45,7 +64,6 @@ def apply_filters(df, args):
             .str.contains(city, na=False)
         ]
 
-    # ---------- Recherche texte ----------
     if query:
         df = df[
             (
@@ -63,9 +81,7 @@ def apply_filters(df, args):
             )
         ]
 
-    # ---------- Filtre dates ----------
     df = filter_by_date(df, start_date, end_date)
-
     return df
 
 # -------------------------------------------------
@@ -76,12 +92,11 @@ def index():
     return render_template("index.html")
 
 # -------------------------------------------------
-# API : catégories disponibles
+# API : catégories (TRADUITES)
 # -------------------------------------------------
 @bp.route("/api/categories")
 def api_categories():
     df = load_events()
-
     if "Category" not in df.columns:
         return jsonify([])
 
@@ -93,7 +108,12 @@ def api_categories():
         .tolist()
     )
 
-    return jsonify(sorted(categories))
+    translated = {
+        CATEGORY_TRANSLATIONS.get(normalize_text(cat), cat)
+        for cat in categories
+    }
+
+    return jsonify(sorted(translated))
 
 # -------------------------------------------------
 # API : recherche intelligente
@@ -103,15 +123,21 @@ def smart_search():
     df = load_events()
     df = apply_filters(df, request.args)
 
-    # ---------- Tri par date ----------
     sort_param = request.args.get("sort", "")
     if sort_param == "date" and "DateTime_start" in df.columns:
         df = df.sort_values("DateTime_start", ascending=True)
 
-    # ---------- Nettoyage JSON (CRUCIAL) ----------
+    # Traduction des catégories (RÉSULTATS)
+    if "Category" in df.columns:
+        df["Category"] = df["Category"].apply(
+            lambda c: CATEGORY_TRANSLATIONS.get(normalize_text(c), c)
+            if isinstance(c, str) else c
+        )
+
+    # Nettoyage JSON
     df = df.where(pd.notna(df), None)
 
-    # ---------- Limite affichage (performance) ----------
+    # Limite affichage
     df = df.head(500)
 
     return jsonify(df.to_dict(orient="records"))
@@ -141,4 +167,3 @@ def cities_by_llm():
     )
 
     return jsonify(city_counts.to_dict(orient="records"))
-
