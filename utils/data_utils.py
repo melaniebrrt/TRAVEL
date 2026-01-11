@@ -6,12 +6,6 @@ import re
 # NORMALISATION TEXTE
 # -------------------------------------------------
 def normalize_text(s: str) -> str:
-    """
-    Normalise le texte :
-    - minuscules
-    - suppression des accents
-    - suppression des espaces multiples
-    """
     if not isinstance(s, str):
         s = str(s)
     s = s.strip()
@@ -23,120 +17,111 @@ def normalize_text(s: str) -> str:
 
 
 # -------------------------------------------------
-# CHARGEMENT ET PRÉPARATION DU CSV
+# PARSING ROBUSTE DES PLAGES DE DATES
+# -------------------------------------------------
+def parse_start_from_datetime(text):
+    """
+    Extrait la date de DÉBUT depuis un champ DateTime texte :
+    - '6–10 may 2026'
+    - '31 Dec 2025, 19:00 – 1 Jan 2026, 02:00'
+    - '2. Jan. 2026, 23:00 – 3. Jan. 2026, 05:00'
+    """
+    if not isinstance(text, str) or not text.strip():
+        return pd.NaT
+
+    # On coupe sur les séparateurs de plage
+    parts = re.split(r"[–\-—to]+", text)
+    try:
+        return pd.to_datetime(parts[0], errors="coerce", dayfirst=True)
+    except:
+        return pd.NaT
+
+
+# -------------------------------------------------
+# CHARGEMENT CSV
 # -------------------------------------------------
 def load_events(csv_file="data/csv_fusionne.csv"):
-    """
-    Charge le CSV et prépare les colonnes nécessaires
-    sans jamais faire planter Flask.
-    """
     try:
         df = pd.read_csv(csv_file)
     except FileNotFoundError:
         print(f"ERREUR : fichier '{csv_file}' introuvable.")
         return pd.DataFrame()
 
-    required_cols = ["lat", "lon", "Category", "City", "Description", "EventName"]
-    missing = [c for c in required_cols if c not in df.columns]
-    if missing:
-        print("ERREUR : colonnes manquantes :", missing)
+    # Colonnes obligatoires
+    required_cols = ["Category", "City", "EventName", "Description"]
+    if not all(col in df.columns for col in required_cols):
         return pd.DataFrame()
 
-    # -------------------------------------------------
     # Coordonnées
-    # -------------------------------------------------
-    df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
-    df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+    df["lat"] = pd.to_numeric(df.get("lat"), errors="coerce")
+    df["lon"] = pd.to_numeric(df.get("lon"), errors="coerce")
 
     # -------------------------------------------------
-    # Gestion des dates (POINT CRITIQUE)
+    # 🔥 RECONSTRUCTION DE LA DATE DE DÉBUT (CRUCIAL)
     # -------------------------------------------------
-    if "DateTime_start" in df.columns:
-        df["DateTime_start"] = pd.to_datetime(
-            df["DateTime_start"],
-            errors="coerce",
-            utc=True
-        )
-    else:
-        df["DateTime_start"] = pd.NaT
+    df["DateTime_start"] = df["DateTime"].apply(parse_start_from_datetime)
 
-    # 👉 Valeur sentinelle pour ne PAS exclure les événements futurs
-    # Les événements sans date claire restent visibles
+    # Fallback : DateTime_end
+    mask = df["DateTime_start"].isna() & df.get("DateTime_end").notna()
+    df.loc[mask, "DateTime_start"] = pd.to_datetime(
+        df.loc[mask, "DateTime_end"], errors="coerce"
+    )
+
+    # Fallback : année/mois/jour
+    def fallback_year(row):
+        year = row.get("Année_start") or row.get("Annee_start")
+        if pd.notna(year):
+            try:
+                return pd.Timestamp(year=int(year), month=1, day=1)
+            except:
+                return pd.NaT
+        return pd.NaT
+
     df["DateTime_start"] = df["DateTime_start"].fillna(
-        pd.Timestamp("2100-01-01", tz="UTC")
+        df.apply(fallback_year, axis=1)
     )
 
     # -------------------------------------------------
-    # Nettoyage colonnes texte
+    # Nettoyage texte
     # -------------------------------------------------
-    text_cols = ["Category", "City", "Description", "EventName"]
-    for col in text_cols:
+    for col in ["Category", "City", "EventName", "Description"]:
         df[col] = df[col].fillna("").astype(str)
 
     return df
 
 
 # -------------------------------------------------
-# FILTRAGE PAR CATÉGORIE
+# FILTRES
 # -------------------------------------------------
 def filter_by_category(df, interests_param):
-    """
-    Filtrage souple par catégorie :
-    - plusieurs intérêts séparés par des virgules
-    - catégories multiples dans une cellule
-    - insensible à la casse / accents
-    """
     if df.empty or not interests_param or "Category" not in df.columns:
         return df
 
-    interests = [
-        normalize_text(i)
-        for i in interests_param.split(",")
-        if i.strip()
-    ]
+    interests = [normalize_text(i) for i in interests_param.split(",") if i.strip()]
 
-    def category_match(cell):
-        if not cell:
-            return False
+    def match(cell):
         cell_norm = normalize_text(cell)
-        tokens = [
-            t.strip()
-            for t in re.split(r"[;,/|-]", cell_norm)
-            if t.strip()
-        ]
-        return any(
-            interest in tokens or interest in cell_norm
-            for interest in interests
-        )
+        return any(i in cell_norm for i in interests)
 
-    return df[df["Category"].apply(category_match)]
+    return df[df["Category"].apply(match)]
 
 
-# -------------------------------------------------
-# FILTRAGE PAR DATE
-# -------------------------------------------------
 def filter_by_date(df, start, end):
-    """
-    Filtre les événements selon une plage de dates.
-    Les événements sans date réelle (sentinelle 2100)
-    ne sont PAS exclus par défaut.
-    """
     if df.empty or "DateTime_start" not in df.columns:
         return df
 
     if start:
         try:
-            start = pd.to_datetime(start, utc=True)
+            start = pd.to_datetime(start)
             df = df[df["DateTime_start"] >= start]
-        except Exception:
+        except:
             pass
 
     if end:
         try:
-            end = pd.to_datetime(end, utc=True)
+            end = pd.to_datetime(end)
             df = df[df["DateTime_start"] <= end]
-        except Exception:
+        except:
             pass
 
     return df
-
