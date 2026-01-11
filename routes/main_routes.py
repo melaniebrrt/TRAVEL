@@ -8,33 +8,88 @@ from utils.data_utils import (
 import pandas as pd
 
 # -------------------------------------------------
-# TRADUCTION DES CATÉGORIES (AFFICHAGE)
+# TRADUCTION DES CATÉGORIES (AFFICHAGE UNIQUEMENT)
 # -------------------------------------------------
 CATEGORY_TRANSLATIONS = {
+    # --- Concerts ---
     "concert": "Concerts",
     "concerts": "Concerts",
+    "konzerte": "Concerts",
+    "conciertos": "Concerts",
+
+    # --- Expositions ---
     "exhibition": "Expositions",
     "exhibitions": "Expositions",
+    "ausstellungen": "Expositions",
+    "exposiciones": "Expositions",
+
+    # --- Marchés ---
     "market": "Marchés",
     "markets": "Marchés",
+    "marches": "Marchés",
+    "marchés": "Marchés",
+    "märkte": "Marchés",
+    "mercados": "Marchés",
+
+    # --- Marchés aux puces ---
+    "flea market": "Marchés aux puces",
+    "flea markets": "Marchés aux puces",
+    "flohmärkte": "Marchés aux puces",
+    "mercadillos": "Marchés aux puces",
+
+    # --- Marchés de Noël ---
+    "christmas market": "Marchés de Noël",
+    "christmas markets": "Marchés de Noël",
+    "marches de noel": "Marchés de Noël",
+    "marchés de noël": "Marchés de Noël",
+    "weihnachtsmärkte": "Marchés de Noël",
+
+    # --- Festivals / foires ---
     "festival": "Festivals",
     "festivals": "Festivals",
-    "theater": "Théâtre",
-    "theatre": "Théâtre",
-    "dance show": "Spectacles de danse",
-    "dance shows": "Spectacles de danse",
-    "opera": "Opéra",
-    "musical": "Comédies musicales",
-    "musicals": "Comédies musicales",
-    "fair": "Foires",
-    "fairs": "Foires",
-    "flea market": "Brocantes",
-    "flea markets": "Brocantes",
+    "festivales": "Festivals",
+    "ferias": "Fêtes et foires",
+    "fetes et foires": "Fêtes et foires",
+
+    # --- Salons professionnels ---
     "trade show": "Salons professionnels",
     "trade shows": "Salons professionnels",
-    "christmas market": "Marchés de Noël",
-    "christmas markets": "Marchés de Noël"
+    "fachmessen": "Salons professionnels",
+    "ferias profesionales": "Salons professionnels",
+
+    # --- Spectacles ---
+    "dance": "Spectacles de danse",
+    "danza": "Spectacles de danse",
+    "tanzshows": "Spectacles de danse",
+
+    # --- Théâtre ---
+    "theatre": "Théâtre",
+    "theater": "Théâtre",
+    "teatro": "Théâtre",
+
+    # --- Opéra ---
+    "opera": "Opéra",
+    "oper": "Opéra",
+
+    # --- Comédies musicales ---
+    "musical": "Comédies musicales",
+    "musicals": "Comédies musicales",
+    "musicales": "Comédies musicales",
+
+    # --- Autres ---
+    "ateliers": "Ateliers",
+    "messen": "Messes",
 }
+
+
+# -------------------------------------------------
+# OUTIL DE TRADUCTION ROBUSTE (ANTI-CRASH)
+# -------------------------------------------------
+def translate_category_safe(value):
+    if not isinstance(value, str):
+        return None
+    key = normalize_text(value)
+    return CATEGORY_TRANSLATIONS.get(key, value)
 
 # -------------------------------------------------
 # Blueprint principal
@@ -42,7 +97,7 @@ CATEGORY_TRANSLATIONS = {
 bp = Blueprint("main", __name__)
 
 # -------------------------------------------------
-# FONCTION DE FILTRAGE COMMUNE
+# FILTRAGE COMMUN
 # -------------------------------------------------
 def apply_filters(df, args):
     df = df.copy()
@@ -85,73 +140,67 @@ def apply_filters(df, args):
     return df
 
 # -------------------------------------------------
-# ROUTE FRONTEND
+# FRONT
 # -------------------------------------------------
 @bp.route("/")
 def index():
     return render_template("index.html")
 
 # -------------------------------------------------
-# API : catégories (TRADUITES)
+# API : CATEGORIES (TRADUITES)
 # -------------------------------------------------
 @bp.route("/api/categories")
 def api_categories():
     df = load_events()
-    if "Category" not in df.columns:
+    if df.empty or "Category" not in df.columns:
         return jsonify([])
 
-    categories = (
-        df["Category"]
-        .dropna()
-        .astype(str)
-        .unique()
-        .tolist()
-    )
-
-    translated = {
-        CATEGORY_TRANSLATIONS.get(normalize_text(cat), cat)
-        for cat in categories
-    }
+    translated = set()
+    for c in df["Category"].dropna():
+        if isinstance(c, str):
+            translated.add(translate_category_safe(c))
 
     return jsonify(sorted(translated))
 
 # -------------------------------------------------
-# API : recherche intelligente
+# API : SMART SEARCH (STABLE)
 # -------------------------------------------------
 @bp.route("/api/smart-search")
 def smart_search():
     df = load_events()
+    if df.empty:
+        return jsonify([])
+
     df = apply_filters(df, request.args)
 
+    # Traduction catégories AVANT nettoyage
+    if "Category" in df.columns:
+        df["Category"] = df["Category"].apply(translate_category_safe)
+
+    # Tri
     sort_param = request.args.get("sort", "")
     if sort_param == "date" and "DateTime_start" in df.columns:
         df = df.sort_values("DateTime_start", ascending=True)
 
-    # Traduction des catégories (RÉSULTATS)
-    if "Category" in df.columns:
-        df["Category"] = df["Category"].apply(
-            lambda c: CATEGORY_TRANSLATIONS.get(normalize_text(c), c)
-            if isinstance(c, str) else c
-        )
-
-    # Nettoyage JSON
-    df = df.where(pd.notna(df), None)
-
-    # Limite affichage
+    # Limite affichage (performance)
     df = df.head(500)
+
+    # 🔥 NETTOYAGE FINAL JSON (ANTI NaN)
+    df = df.astype(object)
+    df = df.where(pd.notna(df), None)
 
     return jsonify(df.to_dict(orient="records"))
 
 # -------------------------------------------------
-# API : villes recommandées
+# API : VILLES RECOMMANDÉES
 # -------------------------------------------------
 @bp.route("/api/cities-by-llm")
 def cities_by_llm():
     df = load_events()
-    df = apply_filters(df, request.args)
-
-    if "City" not in df.columns:
+    if df.empty or "City" not in df.columns:
         return jsonify([])
+
+    df = apply_filters(df, request.args)
 
     df["City"] = df["City"].astype(str).str.strip()
     df = df[df["City"] != ""]
