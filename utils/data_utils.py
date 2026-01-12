@@ -110,6 +110,15 @@ def filter_by_date(df, start, end):
     if df.empty or "DateTime_start" not in df.columns:
         return df
 
+    # -------------------------------------------------
+    # 🔥 EXCLUSION AUTOMATIQUE DES ÉVÉNEMENTS PASSÉS
+    # -------------------------------------------------
+    today = pd.Timestamp.today().normalize()
+    df = df[df["DateTime_start"] >= today]
+
+    # -------------------------------------------------
+    # FILTRES UTILISATEUR (OPTIONNELS)
+    # -------------------------------------------------
     if start:
         try:
             start = pd.to_datetime(start)
@@ -125,3 +134,4 @@ def filter_by_date(df, start, end):
             pass
 
     return df
+
