@@ -8,23 +8,15 @@ from utils.data_utils import (
 import pandas as pd
 import re
 
-# -------------------------------------------------
-# TABLE DE TRADUCTION DES CATÉGORIES (CANONIQUE FR)
-# -------------------------------------------------
 CATEGORY_TRANSLATIONS = {
-    # Concerts
     "concert": "Concerts",
     "concerts": "Concerts",
     "konzerte": "Concerts",
     "conciertos": "Concerts",
-
-    # Expositions
     "exhibition": "Expositions",
     "exhibitions": "Expositions",
     "ausstellungen": "Expositions",
     "exposiciones": "Expositions",
-
-    # Marchés
     "market": "Marchés",
     "markets": "Marchés",
     "marches": "Marchés",
@@ -32,63 +24,41 @@ CATEGORY_TRANSLATIONS = {
     "märkte": "Marchés",
     "maerkte": "Marchés",
     "mercados": "Marchés",
-
-    # Marchés aux puces
     "flea market": "Marchés aux puces",
     "flea markets": "Marchés aux puces",
     "flohmärkte": "Marchés aux puces",
     "flohmaerkte": "Marchés aux puces",
     "mercadillos": "Marchés aux puces",
-
-    # Marchés de Noël
     "christmas market": "Marchés de Noël",
     "christmas markets": "Marchés de Noël",
     "marches de noel": "Marchés de Noël",
     "marchés de noël": "Marchés de Noël",
     "weihnachtsmärkte": "Marchés de Noël",
     "weihnachtsmaerkte": "Marchés de Noël",
-
-    # Festivals / foires
     "festival": "Festivals",
     "festivals": "Festivals",
     "festivales": "Festivals",
     "ferias": "Fêtes et foires",
     "fetes et foires": "Fêtes et foires",
-
-    # Salons pro
     "trade show": "Salons professionnels",
     "trade shows": "Salons professionnels",
     "fachmessen": "Salons professionnels",
     "ferias profesionales": "Salons professionnels",
-
-    # Danse
     "dance": "Spectacles de danse",
     "danza": "Spectacles de danse",
     "tanzshows": "Spectacles de danse",
-
-    # Théâtre
     "theatre": "Théâtre",
     "theater": "Théâtre",
     "teatro": "Théâtre",
-
-    # Opéra
     "opera": "Opéra",
     "oper": "Opéra",
-
-    # Comédies musicales
     "musical": "Comédies musicales",
     "musicals": "Comédies musicales",
     "musicales": "Comédies musicales",
-
-    # Autres
     "ateliers": "Ateliers",
     "messen": "Messes",
 }
 
-
-# -------------------------------------------------
-# TRADUCTION ROBUSTE (CATÉGORIES COMPOSÉES)
-# -------------------------------------------------
 def translate_category_safe(value):
     if not isinstance(value, str) or not value.strip():
         return None
@@ -107,15 +77,9 @@ def translate_category_safe(value):
     return value
 
 
-# -------------------------------------------------
-# BLUEPRINT
-# -------------------------------------------------
 bp = Blueprint("main", __name__)
 
 
-# -------------------------------------------------
-# FILTRES COMMUNS
-# -------------------------------------------------
 def apply_filters(df, args):
     df = df.copy()
 
@@ -146,17 +110,11 @@ def apply_filters(df, args):
     return df
 
 
-# -------------------------------------------------
-# FRONT
-# -------------------------------------------------
 @bp.route("/")
 def index():
     return render_template("index.html")
 
 
-# -------------------------------------------------
-# API : CATÉGORIES (PROPRE)
-# -------------------------------------------------
 @bp.route("/api/categories")
 def api_categories():
     df = load_events()
@@ -172,9 +130,6 @@ def api_categories():
     return jsonify(sorted(categories))
 
 
-# -------------------------------------------------
-# API : SMART SEARCH
-# -------------------------------------------------
 @bp.route("/api/smart-search")
 def smart_search():
     df = load_events()
@@ -183,6 +138,9 @@ def smart_search():
 
     df = apply_filters(df, request.args)
 
+    if "interest_score" in df.columns:
+        df = df.sort_values("interest_score", ascending=False)
+
     if "Category" in df.columns:
         df["Category"] = df["Category"].apply(translate_category_safe)
 
@@ -190,16 +148,12 @@ def smart_search():
         df = df.sort_values("DateTime_start", ascending=True)
 
     df = df.head(500)
-
     df = df.astype(object)
     df = df.where(pd.notna(df), None)
 
     return jsonify(df.to_dict(orient="records"))
 
 
-# -------------------------------------------------
-# API : VILLES
-# -------------------------------------------------
 @bp.route("/api/cities-by-llm")
 def cities_by_llm():
     df = load_events()
