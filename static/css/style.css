@@ -70,11 +70,11 @@ body{
   display:flex;
   gap:12px;
   flex-wrap:wrap;
-  align-items:center;
+  align-items:flex-start;
   margin-bottom:18px;
 }
 
-.input, select, button{
+.input, button{
   padding:12px 14px;
   border-radius:12px;
   border:1px solid rgba(10,25,40,0.06);
@@ -83,6 +83,48 @@ body{
 
 .input{flex:1; min-width:160px;}
 .btn{background:var(--accent); color:white; border:none; cursor:pointer;}
+
+/* -------- Intérêts : checkboxes + étoiles -------- */
+
+.interest-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%;
+}
+
+.interest-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:white;
+  padding:10px 12px;
+  border-radius:10px;
+}
+
+.interest-row label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:500;
+}
+
+.stars{
+  display:flex;
+  gap:4px;
+  cursor:pointer;
+}
+
+.star{
+  font-size:1.1rem;
+  color:#d1d5db;
+  transition:color 0.2s ease;
+}
+
+.star.active{
+  color:#f59e0b;
+}
 
 /* -------- Grid & Cards -------- */
 
@@ -102,7 +144,7 @@ body{
   padding:16px;
   box-shadow:0 8px 30px rgba(18,34,56,0.06);
   display:flex;
-  flex-direction:column;   /* ✅ CORRECTION CLÉ */
+  flex-direction:column;
 }
 
 #map{
@@ -133,6 +175,17 @@ body{
   justify-content:space-between;
   align-items:center;
   font-weight:600;
+  cursor:pointer;
+}
+
+.city-pill.active{
+  background:linear-gradient(135deg,#0f3d6e,#2563eb);
+  color:white;
+  box-shadow:0 6px 18px rgba(15,61,110,0.35);
+}
+
+.city-pill.active .small{
+  color:rgba(255,255,255,0.85);
 }
 
 /* -------- Events -------- */
@@ -220,7 +273,8 @@ body.dark .hero-card{
 
 body.dark .card,
 body.dark .event-card,
-body.dark .city-pill{
+body.dark .city-pill,
+body.dark .interest-row{
   background:rgba(20,25,40,0.85);
   border:1px solid rgba(255,255,255,0.15);
   color:#e2e8f0;
@@ -243,6 +297,14 @@ body.dark .tag{
   border:1px solid rgba(96,165,250,0.4);
 }
 
+body.dark .star{
+  color:#64748b;
+}
+
+body.dark .star.active{
+  color:#fbbf24;
+}
+
 body.dark #map{
   filter:brightness(0.7);
 }
@@ -260,36 +322,4 @@ body.dark .dark-btn{
 
 body.dark .dark-btn:hover{
   background-color:rgba(59,130,246,0.9);
-}
-.city-pill.active {
-  background: linear-gradient(135deg, #0f3d6e, #2563eb);
-  color: white;
-  box-shadow: 0 6px 18px rgba(15, 61, 110, 0.35);
-}
-
-.city-pill.active .small {
-  color: rgba(255,255,255,0.85);
-}
-
-.interest-weights {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 6px;
-  width: 100%;
-}
-
-.weight-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.9rem;
-}
-
-.weight-row span {
-  min-width: 110px;
-}
-
-.weight-row input[type="range"] {
-  flex: 1;
 }
