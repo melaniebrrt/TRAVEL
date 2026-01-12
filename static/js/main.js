@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const darkToggle = document.getElementById('dark-toggle');
 
   let sortByDate = false;
-  let selectedCity = null; // ⭐ ville active
+  let selectedCity = null;
 
   // ===================
   // MODE SOMBRE
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/categories')
     .then(res => res.json())
     .then(categories => {
-      interestSelect.innerHTML = '<option value="">-- Tous --</option>';
+      interestSelect.innerHTML = '';
       categories.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat;
@@ -120,12 +120,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildQueryParams(includeCity = true) {
     const params = new URLSearchParams();
 
-    if (interestSelect.value) {
-      const normalizedInterest = interestSelect.value
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
-      params.set('interests', normalizedInterest);
+    const selectedOptions = Array.from(interestSelect.selectedOptions)
+      .map(opt =>
+        opt.value
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+      );
+
+    if (selectedOptions.length) {
+      params.set('interests', selectedOptions.join(','));
     }
 
     params.set('q', searchInput.value.trim() || '');
@@ -146,11 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===================
   function searchEvents() {
 
-    // 👉 villes : TOUJOURS SANS filtre ville
     cityResultsContainer.innerHTML = '<div class="small">Chargement…</div>';
     fetchCities(buildQueryParams(false));
 
-    // 👉 événements : AVEC filtre ville si sélectionnée
     const url = `/api/smart-search?${buildQueryParams(true)}`;
     eventListContainer.innerHTML = '<div class="small">Chargement…</div>';
     markersLayer.clearLayers();
@@ -186,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===================
-  // VILLES (CLIQUABLES + SURBRILLANCE)
+  // VILLES
   // ===================
   function fetchCities(queryString) {
     fetch(`/api/cities-by-llm?${queryString}`)
