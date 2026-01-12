@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // DOM
   // ===================
   const interestSelect = document.getElementById('interest-select');
+  const weightContainer = document.getElementById('interest-weights'); // 🔥 AJOUT
   const searchInput = document.getElementById('search-input');
   const searchButton = document.getElementById('search-button');
   const eventListContainer = document.getElementById('event-list-container');
@@ -60,6 +61,31 @@ document.addEventListener('DOMContentLoaded', () => {
         interestSelect.appendChild(option);
       });
     });
+
+  // ===================
+  // SLIDERS DE POIDS (AJOUT)
+  // ===================
+  function updateWeightSliders() {
+    weightContainer.innerHTML = '';
+
+    Array.from(interestSelect.selectedOptions).forEach(opt => {
+      const row = document.createElement('div');
+      row.className = 'weight-row';
+
+      const label = document.createElement('span');
+      label.textContent = opt.value;
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = 1;
+      slider.max = 5;
+      slider.value = 3;
+      slider.dataset.interest = opt.value;
+
+      row.append(label, slider);
+      weightContainer.appendChild(row);
+    });
+  }
 
   // ===================
   // EVENT CARD
@@ -115,21 +141,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===================
-  // QUERY PARAMS
+  // QUERY PARAMS (MODIFIÉ)
   // ===================
   function buildQueryParams(includeCity = true) {
     const params = new URLSearchParams();
 
-    const selectedOptions = Array.from(interestSelect.selectedOptions)
-      .map(opt =>
-        opt.value
+    const sliders = weightContainer.querySelectorAll('input[type="range"]');
+
+    if (sliders.length) {
+      const weighted = Array.from(sliders).map(slider =>
+        `${slider.dataset.interest
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .toLowerCase()
+        }:${slider.value}`
       );
-
-    if (selectedOptions.length) {
-      const weighted = selectedOptions.map(i => `${i}:2`);
       params.set('interests', weighted.join(','));
     }
 
@@ -242,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   interestSelect.addEventListener('change', () => {
     selectedCity = null;
+    updateWeightSliders(); // 🔥 AJOUT
     searchEvents();
   });
 
@@ -262,3 +289,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===================
   searchEvents();
 });
+
