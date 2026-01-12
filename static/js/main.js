@@ -129,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
     if (selectedOptions.length) {
-      params.set('interests', selectedOptions.join(','));
+      const weighted = selectedOptions.map(i => `${i}:2`);
+      params.set('interests', weighted.join(','));
     }
 
     params.set('q', searchInput.value.trim() || '');
