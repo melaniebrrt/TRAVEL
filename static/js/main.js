@@ -14,8 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===================
   // DOM
   // ===================
-  const interestSelect = document.getElementById('interest-select');
-  const weightContainer = document.getElementById('interest-weights'); // 🔥 AJOUT
+  const interestList = document.getElementById('interest-list');
   const searchInput = document.getElementById('search-input');
   const searchButton = document.getElementById('search-button');
   const eventListContainer = document.getElementById('event-list-container');
@@ -48,42 +47,63 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ===================
-  // CATÉGORIES
+  // CATÉGORIES → CHECKBOXES + ÉTOILES
   // ===================
   fetch('/api/categories')
     .then(res => res.json())
-    .then(categories => {
-      interestSelect.innerHTML = '';
-      categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat;
-        option.textContent = cat;
-        interestSelect.appendChild(option);
-      });
-    });
+    .then(renderInterests);
 
-  // ===================
-  // SLIDERS DE POIDS (AJOUT)
-  // ===================
-  function updateWeightSliders() {
-    weightContainer.innerHTML = '';
+  function renderInterests(categories) {
+    interestList.innerHTML = '';
 
-    Array.from(interestSelect.selectedOptions).forEach(opt => {
+    categories.forEach(cat => {
       const row = document.createElement('div');
-      row.className = 'weight-row';
+      row.className = 'interest-row';
 
-      const label = document.createElement('span');
-      label.textContent = opt.value;
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.interest = cat;
 
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = 1;
-      slider.max = 5;
-      slider.value = 3;
-      slider.dataset.interest = opt.value;
+      const text = document.createElement('span');
+      text.textContent = cat;
 
-      row.append(label, slider);
-      weightContainer.appendChild(row);
+      label.append(checkbox, text);
+
+      const stars = document.createElement('div');
+      stars.className = 'stars';
+      stars.dataset.value = 3;
+
+      for (let i = 1; i <= 5; i++) {
+        const star = document.createElement('span');
+        star.className = 'star';
+        star.textContent = '★';
+
+        star.addEventListener('click', () => {
+          stars.dataset.value = i;
+          updateStars(stars, i);
+          searchEvents();
+        });
+
+        stars.appendChild(star);
+      }
+
+      updateStars(stars, 3);
+
+      checkbox.addEventListener('change', () => {
+        selectedCity = null;
+        searchEvents();
+      });
+
+      row.append(label, stars);
+      interestList.appendChild(row);
+    });
+  }
+
+  function updateStars(container, value) {
+    const stars = container.querySelectorAll('.star');
+    stars.forEach((star, idx) => {
+      star.classList.toggle('active', idx < value);
     });
   }
 
@@ -141,21 +161,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ===================
-  // QUERY PARAMS (MODIFIÉ)
+  // QUERY PARAMS (⭐ PONDÉRATION)
   // ===================
   function buildQueryParams(includeCity = true) {
     const params = new URLSearchParams();
 
-    const sliders = weightContainer.querySelectorAll('input[type="range"]');
+    const rows = interestList.querySelectorAll('.interest-row');
+    const weighted = [];
 
-    if (sliders.length) {
-      const weighted = Array.from(sliders).map(slider =>
-        `${slider.dataset.interest
+    rows.forEach(row => {
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      if (checkbox.checked) {
+        const interest = checkbox.dataset.interest
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-        }:${slider.value}`
-      );
+          .toLowerCase();
+
+        const stars = row.querySelector('.stars');
+        weighted.push(`${interest}:${stars.dataset.value}`);
+      }
+    });
+
+    if (weighted.length) {
       params.set('interests', weighted.join(','));
     }
 
@@ -266,22 +293,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') searchEvents();
   });
 
-  interestSelect.addEventListener('change', () => {
-    selectedCity = null;
-    updateWeightSliders(); // 🔥 AJOUT
-    searchEvents();
-  });
-
-  dateStartInput.addEventListener('change', () => {
-    selectedCity = null;
-    searchEvents();
-  });
-
-  dateEndInput.addEventListener('change', () => {
-    selectedCity = null;
-    searchEvents();
-  });
-
   feather.replace();
 
   // ===================
@@ -289,4 +300,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===================
   searchEvents();
 });
-
