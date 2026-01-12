@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Travel Planner</title>
 
+<!-- FontAwesome & Leaflet -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
+<!-- CSS Flask -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -30,12 +32,11 @@
 </header>
 
 <main class="container">
+  <!-- Contrôles -->
   <div class="controls">
 
-    <select id="interest-select" class="input" multiple size="4"></select>
-
-    <!-- 🔥 AJOUT UNIQUE -->
-    <div id="interest-weights" class="interest-weights"></div>
+    <!-- 🔥 NOUVELLE UI : CHECKBOXES + ÉTOILES -->
+    <div id="interest-list" class="interest-list"></div>
 
     <input id="search-input" class="input" type="text"
            placeholder="Recherche libre — ex: jazz, expo, randonnée">
@@ -53,6 +54,7 @@
     </button>
   </div>
 
+  <!-- Carte + Résultats -->
   <section class="grid">
     <div class="card">
       <h2>Carte & hotspot</h2>
@@ -79,8 +81,10 @@
   2026 · Travel Planner — Événements & découvertes culturelles.
 </footer>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<!-- JS Flask -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></cript>
 </body>
 </html>
+
 
 
