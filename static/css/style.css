@@ -271,3 +271,25 @@ body.dark .dark-btn:hover{
   color: rgba(255,255,255,0.85);
 }
 
+.interest-weights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.weight-row span {
+  min-width: 110px;
+}
+
+.weight-row input[type="range"] {
+  flex: 1;
+}
