@@ -323,3 +323,42 @@ body.dark .dark-btn{
 body.dark .dark-btn:hover{
   background-color:rgba(59,130,246,0.9);
 }
+/* =================================================
+   🔽 Dropdown centres d’intérêt (AJOUT UNIQUE)
+   ================================================= */
+
+.interest-dropdown{
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+#interest-toggle{
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.interest-panel{
+  position: absolute;
+  top: 110%;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.interest-panel.hidden{
+  display: none;
+}
+
+/* Dark mode dropdown */
+body.dark .interest-panel{
+  background: rgba(20,25,40,0.95);
+  border: 1px solid rgba(255,255,255,0.15);
+}
