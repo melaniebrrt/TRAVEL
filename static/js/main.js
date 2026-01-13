@@ -15,6 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // DOM
   // ===================
   const interestList = document.getElementById('interest-list');
+  const interestToggle = document.getElementById('interest-toggle');
+  const interestPanel = document.getElementById('interest-panel');
+
   const searchInput = document.getElementById('search-input');
   const searchButton = document.getElementById('search-button');
   const eventListContainer = document.getElementById('event-list-container');
@@ -26,6 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let sortByDate = false;
   let selectedCity = null;
+
+  // ===================
+  // DROPDOWN INTÉRÊTS
+  // ===================
+  if (interestToggle && interestPanel) {
+    interestToggle.addEventListener('click', () => {
+      interestPanel.classList.toggle('hidden');
+    });
+
+    // Fermer le dropdown au clic extérieur
+    document.addEventListener('click', (e) => {
+      if (!interestPanel.contains(e.target) && !interestToggle.contains(e.target)) {
+        interestPanel.classList.add('hidden');
+      }
+    });
+  }
 
   // ===================
   // MODE SOMBRE
@@ -61,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.className = 'interest-row';
 
       const label = document.createElement('label');
+
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.dataset.interest = cat;
@@ -264,7 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cities.slice(0, 8).forEach(c => {
       const div = document.createElement('div');
       div.className = 'city-pill';
-      div.style.cursor = 'pointer';
 
       if (selectedCity === c.City) {
         div.classList.add('active');
@@ -300,3 +319,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // ===================
   searchEvents();
 });
+
