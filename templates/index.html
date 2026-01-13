@@ -35,8 +35,16 @@
   <!-- Contrôles -->
   <div class="controls">
 
-    <!-- 🔥 NOUVELLE UI : CHECKBOXES + ÉTOILES -->
-    <div id="interest-list" class="interest-list"></div>
+    <!-- 🔽 Centres d’intérêt : dropdown compact -->
+    <div class="interest-dropdown">
+      <button id="interest-toggle" class="input">
+        Centres d’intérêt ▾
+      </button>
+
+      <div id="interest-panel" class="interest-panel hidden">
+        <div id="interest-list" class="interest-list"></div>
+      </div>
+    </div>
 
     <input id="search-input" class="input" type="text"
            placeholder="Recherche libre — ex: jazz, expo, randonnée">
